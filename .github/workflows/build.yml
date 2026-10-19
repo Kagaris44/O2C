@@ -65,7 +65,7 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build --logger "console;verbosity=detailed"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: openconnect-bin
           path: openconnect-bin
@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: OpenToConnect-msi
           path: msi
