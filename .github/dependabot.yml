@@ -1,0 +1,18 @@
+# Dependabot только предлагает обновления в виде PR; сливает их владелец репозитория.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # WiX 6 и новее — другая лицензия (плата за коммерческое использование); остаёмся на 5.x.
+      - dependency-name: "WixToolset.*"
+        update-types: ["version-update:semver-major"]

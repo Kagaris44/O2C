@@ -16,6 +16,11 @@
 
     <Property Id="ARPNOMODIFY" Value="1" />
 
+    <!-- Иконка для ярлыка «Пуск», закреплённой кнопки на панели задач и списка «Приложения».
+         Объявленный (advertised) ярлык берёт иконку только из таблицы Icon пакета. -->
+    <Icon Id="O2CIcon.exe" SourceFile="$(PublishDir)OpenToConnect.exe" />
+    <Property Id="ARPPRODUCTICON" Value="O2CIcon.exe" />
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenToConnect" />
     </StandardDirectory>
@@ -44,7 +49,7 @@
     <Component Id="AppComponent" Directory="INSTALLFOLDER">
       <File Id="AppExe" Source="$(PublishDir)OpenToConnect.exe" KeyPath="yes">
         <Shortcut Id="AppShortcut" Directory="ProgramMenuFolder" Name="OpenToConnect"
-                  WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+                  WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="O2CIcon.exe" IconIndex="0" />
       </File>
     </Component>
 
