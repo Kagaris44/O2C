@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <Version>0.7.0</Version>
+    <Version>0.7.1</Version>
     <Company>Kagaris44</Company>
     <Product>OpenToConnect</Product>
     <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
