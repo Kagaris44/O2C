@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Version>0.7.0</Version>
+    <Company>Kagaris44</Company>
+    <Product>OpenToConnect</Product>
+    <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>

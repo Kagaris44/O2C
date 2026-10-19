@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <!-- Только ради значка в области уведомлений (NotifyIcon). -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>O2C.App</RootNamespace>
+    <AssemblyName>OpenToConnect</AssemblyName>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>O2C.ico</ApplicationIcon>
+    <!-- ThemeMode (тема по системе, Fluent) в WPF помечен как экспериментальный. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Не путать типы WPF и WinForms (Application, Button, MessageBox...). -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="O2C.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\O2C.Core\O2C.Core.csproj" />
+  </ItemGroup>
+</Project>

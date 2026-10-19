@@ -1,0 +1,78 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <!-- UpgradeCode не менять: по нему новая версия заменяет старую. -->
+  <Package Name="OpenToConnect"
+           Manufacturer="Kagaris44"
+           Version="$(ProductVersion)"
+           UpgradeCode="6F2C1D3A-8B47-4E0B-9C51-2A7D9E4B1F60"
+           Scope="perMachine"
+           Compressed="yes"
+           Language="1049"
+           Codepage="1251">
+
+    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия OpenToConnect." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="OpenToConnect" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="OpenToConnect">
+      <!-- Все файлы приложения, кроме двух exe: они объявлены отдельно (служба и ярлык). -->
+      <Files Directory="INSTALLFOLDER" Include="$(PublishDir)**">
+        <Exclude Files="$(PublishDir)OpenToConnect.Service.exe" />
+        <Exclude Files="$(PublishDir)OpenToConnect.exe" />
+      </Files>
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="AppComponent" />
+      <ComponentRef Id="AutostartComponent" />
+    </Feature>
+
+    <!-- Окно живёт в области уведомлений и держит файлы — перед установкой закрываем его. -->
+    <util:CloseApplication Id="CloseGui" Target="OpenToConnect.exe" CloseMessage="no" TerminateProcess="0"
+                           RebootPrompt="no" />
+
+    <!-- Значок в области уведомлений при входе в Windows (окно не открывается). -->
+    <Component Id="AutostartComponent" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="OpenToConnect"
+                     Type="string" Value="&quot;[INSTALLFOLDER]OpenToConnect.exe&quot; --minimized" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AppComponent" Directory="INSTALLFOLDER">
+      <File Id="AppExe" Source="$(PublishDir)OpenToConnect.exe" KeyPath="yes">
+        <Shortcut Id="AppShortcut" Directory="ProgramMenuFolder" Name="OpenToConnect"
+                  WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+      </File>
+    </Component>
+
+    <Component Id="ServiceComponent" Directory="INSTALLFOLDER">
+      <File Id="ServiceExe" Source="$(PublishDir)OpenToConnect.Service.exe" KeyPath="yes" />
+      <!-- Имя службы должно совпадать с ServicePaths.ServiceName. -->
+      <ServiceInstall Name="O2C"
+                      DisplayName="OpenToConnect"
+                      Description="Служба подключения OpenToConnect"
+                      Type="ownProcess"
+                      Start="auto"
+                      Account="LocalSystem"
+                      ErrorControl="normal"
+                      Vital="yes">
+        <!-- При падении — перезапуск через 5 с; счётчик сбоев сбрасывается раз в сутки. -->
+        <util:ServiceConfig FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="5"
+                            ResetPeriodInDays="1" />
+      </ServiceInstall>
+      <ServiceControl Id="ServiceControl" Name="O2C" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+
+    <!-- После установки запускаем окно программы (только при интерактивной установке). -->
+    <CustomAction Id="LaunchApp" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]OpenToConnect.exe&quot;" Return="asyncNoWait" Impersonate="yes" Execute="immediate" />
+    <InstallExecuteSequence>
+      <Custom Action="LaunchApp" After="InstallFinalize" Condition="NOT Installed AND UILevel &gt;= 4" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>
