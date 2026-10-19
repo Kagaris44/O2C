@@ -1,0 +1,21 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!--
+    Установщик OpenToConnect (MSI). Собирается из build/publish.ps1:
+      dotnet build installer/O2C.Installer.wixproj -p:PublishDir=<папка publish> -p:ProductVersion=<версия>
+    WiX 5 — лицензия MS-RL, без платы за использование (в отличие от WiX 6+).
+  -->
+  <PropertyGroup>
+    <OutputName>OpenToConnect-$(ProductVersion)</OutputName>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>ProductVersion=$(ProductVersion);PublishDir=$(PublishDir)</DefineConstants>
+    <SuppressValidation>false</SuppressValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+  <Target Name="CheckInputs" BeforeTargets="Build">
+    <Error Condition="'$(PublishDir)' == '' Or !Exists('$(PublishDir)OpenToConnect.Service.exe')" Text="PublishDir не задан или в нём нет OpenToConnect.Service.exe" />
+    <Error Condition="'$(ProductVersion)' == ''" Text="ProductVersion не задан" />
+  </Target>
+</Project>

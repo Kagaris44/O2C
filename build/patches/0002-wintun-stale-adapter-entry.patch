@@ -1,0 +1,27 @@
+OpenToConnect: do not fail on a stale registry entry of a removed Wintun adapter.
+
+License: LGPL-2.1-or-later, the same as OpenConnect itself.
+
+After a disconnect Windows may keep the registry entry of the removed adapter for a while.
+openconnect finds the name there, WintunOpenAdapter() fails with ERROR_NOT_FOUND and the
+connection is aborted. Treat "not found" as "not usable" so that a new adapter is created.
+
+--- a/wintun.c
++++ b/wintun.c
+@@ -148,12 +148,14 @@
+ 	if (!vpninfo->wintun_adapter) {
+ 		vpninfo->wintun_adapter = WintunOpenAdapter(wname);
+ 		if (!vpninfo->wintun_adapter) {
+-			char *errstr = openconnect__win32_strerror(GetLastError());
++			DWORD err = GetLastError();
++			char *errstr = openconnect__win32_strerror(err);
+ 			vpn_progress(vpninfo, PRG_ERR, "Could not open Wintun adapter '%S': %s\n",
+ 				     wname, errstr);
+ 			free(errstr);
+
+-			ret = OPEN_TUN_HARDFAIL;
++			/* OpenToConnect: stale entry of a removed adapter - let the caller create a new one. */
++			ret = (err == ERROR_NOT_FOUND) ? OPEN_TUN_SOFTFAIL : OPEN_TUN_HARDFAIL;
+ 			goto out;
+ 		}
+ 	}

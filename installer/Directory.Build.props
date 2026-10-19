@@ -1,0 +1,3 @@
+<Project>
+  <!-- Не наследуем настройки .NET-проектов из корневого Directory.Build.props. -->
+</Project>

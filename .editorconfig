@@ -1,0 +1,24 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{xml,xaml,csproj,props,json,yml}]
+indent_size = 2
+
+[*.sh]
+end_of_line = lf
+
+[*.cs]
+# Сервис — не библиотека, ConfigureAwait не нужен.
+dotnet_diagnostic.CA2007.severity = none
+# Сообщения для пользователя — на русском, локализация не нужна.
+dotnet_diagnostic.CA1303.severity = none
+# Логирование через интерполяцию допустимо: объём небольшой.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA2254.severity = none
+dotnet_diagnostic.CA1873.severity = none

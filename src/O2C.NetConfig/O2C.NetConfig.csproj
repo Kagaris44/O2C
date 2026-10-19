@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>O2C.NetConfig</RootNamespace>
+    <AssemblyName>OpenToConnect.NetConfig</AssemblyName>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\O2C.Core\O2C.Core.csproj" />
+    <ProjectReference Include="..\O2C.Network\O2C.Network.csproj" />
+  </ItemGroup>
+</Project>

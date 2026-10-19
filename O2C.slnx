@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/O2C.App/O2C.App.csproj" />
+    <Project Path="src/O2C.Core/O2C.Core.csproj" />
+    <Project Path="src/O2C.NetConfig/O2C.NetConfig.csproj" />
+    <Project Path="src/O2C.Network/O2C.Network.csproj" />
+    <Project Path="src/O2C.Service/O2C.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/O2C.Core.Tests/O2C.Core.Tests.csproj" />
+    <Project Path="tests/O2C.Service.Tests/O2C.Service.Tests.csproj" />
+  </Folder>
+</Solution>

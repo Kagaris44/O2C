@@ -1,0 +1,118 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  openconnect:
+    name: openconnect.exe (MSYS2)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache openconnect build
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: openconnect-bin
+          key: openconnect-${{ hashFiles('build/build-openconnect.sh', 'build/patches/**') }}
+
+      - uses: msys2/setup-msys2@v2
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make patch
+          pacboy: gcc:p pkgconf:p gnutls:p libxml2:p zlib:p lz4:p
+
+      - name: Build openconnect
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: bash build/build-openconnect.sh openconnect-bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openconnect-bin
+          path: openconnect-bin
+
+  dotnet:
+    name: .NET build, test, publish
+    runs-on: windows-latest
+    needs: openconnect
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Wintun for integration tests
+        shell: pwsh
+        run: |
+          ./build/fetch-runtime.ps1 -OutDir test-runtime
+          "O2C_WINTUN_DLL=$(Resolve-Path test-runtime/wintun.dll)" >> $env:GITHUB_ENV
+
+      - name: Test
+        run: dotnet test -c Release --no-build --logger "console;verbosity=detailed"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: openconnect-bin
+          path: openconnect-bin
+
+      - name: Publish and build MSI
+        shell: pwsh
+        run: ./build/publish.ps1 -OpenConnectDir openconnect-bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenToConnect-msi
+          path: artifacts/*.msi
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    runs-on: windows-latest
+    needs: dotnet
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: OpenToConnect-msi
+          path: msi
+
+      - name: Create release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          if ("v$version" -ne $tag) { throw "Тег $tag не совпадает с версией $version в Directory.Build.props" }
+
+          $msi = "msi/OpenToConnect-$version.msi"
+          if (-not (Test-Path $msi)) { throw "Не найден $msi" }
+          $hash = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
+
+          # Примечания к релизу — раздел этой версии из истории изменений в README.
+          $readme = Get-Content README.md -Raw
+          $m = [regex]::Match($readme, "(?ms)^### $([regex]::Escape($version))\b.*?\r?\n(.*?)(?=^### |^## |\z)")
+          $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "OpenToConnect $version" }
+          $notes += "`n`nSHA-256 ``OpenToConnect-$version.msi``: ``$hash``"
+          Set-Content notes.md $notes
+
+          gh release create $tag $msi --title "OpenToConnect $version" --notes-file notes.md
