@@ -95,17 +95,23 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
     public static Dictionary<int, int> EnumRecentTypes(TimeSpan back, List<string> samples)
     {
         var result = new Dictionary<int, int>();
-        if (FwpmEngineOpen0(null, RPC_C_AUTHN_DEFAULT, IntPtr.Zero, IntPtr.Zero, out var engine) != 0)
+        int rc = FwpmEngineOpen0(null, RPC_C_AUTHN_DEFAULT, IntPtr.Zero, IntPtr.Zero, out var engine);
+        samples.Add($"open=0x{rc:X}");
+        if (rc != 0)
             return result;
         try
         {
             var template = stackalloc byte[32];
             FillTemplate(template, back);
-            if (FwpmNetEventCreateEnumHandle0(engine, template, out var handle) != 0)
+            rc = FwpmNetEventCreateEnumHandle0(engine, template, out var handle);
+            samples.Add($"createEnum=0x{rc:X}");
+            if (rc != 0)
                 return result;
             try
             {
-                if (FwpmNetEventEnum1(engine, handle, 5000, out var entries, out var count) != 0 || entries == IntPtr.Zero)
+                rc = FwpmNetEventEnum1(engine, handle, 5000, out var entries, out var count);
+                samples.Add($"enum=0x{rc:X} count={count}");
+                if (rc != 0 || entries == IntPtr.Zero)
                     return result;
                 try
                 {
