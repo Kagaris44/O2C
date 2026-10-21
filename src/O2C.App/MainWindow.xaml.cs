@@ -209,6 +209,13 @@ public partial class MainWindow : Window
             await AddExclusionsAsync(dialog.FolderName);
     }
 
+    private async void OnAddAppRunningClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new RunningAppPicker { Owner = this };
+        if (picker.ShowDialog() == true && picker.SelectedPath is { } path)
+            await AddExclusionsAsync(path);
+    }
+
     private async Task AddExclusionsAsync(string input)
     {
         if (string.IsNullOrWhiteSpace(input))

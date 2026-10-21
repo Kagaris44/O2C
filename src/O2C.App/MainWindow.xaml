@@ -107,6 +107,8 @@
                       ToolTip="Добавить программу или папку: её соединения пойдут мимо туннеля" Click="OnAddAppClick">
                 <Button.ContextMenu>
                   <ContextMenu>
+                    <MenuItem Header="Из запущенных…" Click="OnAddAppRunningClick" />
+                    <Separator />
                     <MenuItem Header="Программа (.exe)…" Click="OnAddAppFileClick" />
                     <MenuItem Header="Папка с программами…" Click="OnAddAppFolderClick" />
                   </ContextMenu>
