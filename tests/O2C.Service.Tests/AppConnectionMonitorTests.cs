@@ -15,7 +15,8 @@ namespace O2C.Service.Tests;
 public class AppConnectionMonitorTests(ITestOutputHelper output)
 {
     private static readonly IPAddress UdpTarget = IPAddress.Parse("198.51.100.77");
-    private static readonly IPAddress TcpTarget = IPAddress.Parse("192.0.2.10");
+    // Событие ядра о TCP приходит, когда соединение установлено, поэтому нужен настоящий сервер.
+    private const string TcpHost = "example.com";
 
     private bool HasAdmin()
     {
@@ -43,16 +44,11 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
             await udp.SendAsync(new byte[] { 1, 2, 3 }, 3, new IPEndPoint(UdpTarget, 40000));
         var udpSent = sw.Elapsed;
 
+        var tcpTarget = (await Dns.GetHostAddressesAsync(TcpHost)).First(a => a.AddressFamily == AddressFamily.InterNetwork);
+        var tcpStart = sw.Elapsed;
         using (var tcp = new TcpClient(AddressFamily.InterNetwork))
-        {
-            try
-            {
-                await tcp.ConnectAsync(TcpTarget, 40001).WaitAsync(TimeSpan.FromSeconds(1));
-            }
-            catch (Exception ex) when (ex is TimeoutException or SocketException)
-            {
-            }
-        }
+            await tcp.ConnectAsync(tcpTarget, 443).WaitAsync(TimeSpan.FromSeconds(10));
+        var tcpConnected = sw.Elapsed;
 
         int self = Environment.ProcessId;
         AppConnection? udpEvent = null, tcpEvent = null;
@@ -63,7 +59,7 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
             {
                 if (udpEvent is null && e.RemoteAddress.Equals(UdpTarget))
                     (udpEvent, udpSeen) = (e, sw.Elapsed);
-                if (tcpEvent is null && e.RemoteAddress.Equals(TcpTarget))
+                if (tcpEvent is null && e.RemoteAddress.Equals(tcpTarget))
                     (tcpEvent, tcpSeen) = (e, sw.Elapsed);
             }
             await Task.Delay(20);
@@ -74,7 +70,7 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
         foreach (var e in events.Take(10))
             output.WriteLine($"  {e.Protocol,2} {e.RemoteAddress}:{e.RemotePort}  pid {e.ProcessId}  {e.AppPath}");
         output.WriteLine($"UDP: {(udpEvent is null ? "нет события" : $"через {(udpSeen - udpSent).TotalMilliseconds:0} мс после отправки, порт {udpEvent.RemotePort}, {udpEvent.AppPath}")}");
-        output.WriteLine($"TCP: {(tcpEvent is null ? "нет события" : $"порт {tcpEvent.RemotePort}, {tcpEvent.AppPath}")}");
+        output.WriteLine($"TCP: {(tcpEvent is null ? "нет события" : $"через {(tcpSeen - tcpConnected).TotalMilliseconds:0} мс после соединения ({(tcpConnected - tcpStart).TotalMilliseconds:0} мс на соединение), порт {tcpEvent.RemotePort}, {tcpEvent.AppPath}")}");
 
         Assert.NotNull(udpEvent);
         Assert.NotNull(tcpEvent);
@@ -82,7 +78,9 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
         Assert.Equal(17, udpEvent.Protocol);
         Assert.Equal(6, tcpEvent.Protocol);
         Assert.Equal(40000, udpEvent.RemotePort);
-        Assert.Equal(40001, tcpEvent.RemotePort);
+        Assert.Equal(443, tcpEvent.RemotePort);
+        // С принудительной выгрузкой буферов событие должно приходить быстрее секунды.
+        Assert.True(udpSeen - udpSent < TimeSpan.FromSeconds(1), $"UDP-событие пришло через {(udpSeen - udpSent).TotalMilliseconds:0} мс");
     }
 
     /// <summary>Замер: сколько процессорного времени стоит наблюдение при потоке UDP-пакетов.</summary>

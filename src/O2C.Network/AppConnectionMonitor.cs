@@ -39,6 +39,7 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
     private ulong _session;
     private ulong _trace = InvalidTrace;
     private Thread? _thread;
+    private Timer? _flush;
     private GCHandle _self;
     private long _eventCount;
 
@@ -54,6 +55,20 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
         StartSession();
         EnableProvider();
         OpenConsumer();
+        // Windows отдаёт события пачками по таймеру сеанса (не чаще раза в секунду).
+        // Принудительная выгрузка буферов сокращает задержку до ~четверти секунды.
+        _flush = new Timer(_ => Flush(), null, FlushInterval, FlushInterval);
+    }
+
+    private static readonly TimeSpan FlushInterval = TimeSpan.FromMilliseconds(250);
+
+    private void Flush()
+    {
+        if (_session == 0)
+            return;
+        var props = stackalloc byte[PropertiesTotal];
+        FillProperties(props);
+        _ = ControlTraceW(_session, null, props, 3 /* EVENT_TRACE_CONTROL_FLUSH */);
     }
 
     // ---------- Сеанс трассировки ----------
@@ -86,8 +101,8 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(span[40..], 1);                  // Wnode.ClientContext = QPC
         BinaryPrimitives.WriteUInt32LittleEndian(span[44..], 0x20000);            // Wnode.Flags = WNODE_FLAG_TRACED_GUID
         BinaryPrimitives.WriteUInt32LittleEndian(span[48..], 64);                 // BufferSize, КБ
-        BinaryPrimitives.WriteUInt32LittleEndian(span[52..], 4);                  // MinimumBuffers
-        BinaryPrimitives.WriteUInt32LittleEndian(span[56..], 32);                 // MaximumBuffers
+        BinaryPrimitives.WriteUInt32LittleEndian(span[52..], 8);                  // MinimumBuffers
+        BinaryPrimitives.WriteUInt32LittleEndian(span[56..], 128);                // MaximumBuffers (8 МБ при всплесках)
         BinaryPrimitives.WriteUInt32LittleEndian(span[64..], 0x100);              // LogFileMode = EVENT_TRACE_REAL_TIME_MODE
         BinaryPrimitives.WriteUInt32LittleEndian(span[68..], 1);                  // FlushTimer, с
         BinaryPrimitives.WriteUInt32LittleEndian(span[116..], PropertiesSize);    // LoggerNameOffset
@@ -234,6 +249,8 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
 
     public void Dispose()
     {
+        _flush?.Dispose();
+        _flush = null;
         if (_session != 0)
         {
             var props = stackalloc byte[PropertiesTotal];
