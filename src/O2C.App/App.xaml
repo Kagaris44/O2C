@@ -6,9 +6,16 @@
   <Application.Resources>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-    <!-- Кнопка-значок без рамки. -->
+    <!-- Кнопка-значок без рамки. Шрифт значков — только у самого значка: меню и подсказки
+         наследуют шрифт от кнопки, а в шрифте значков нет букв. -->
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+      <Setter Property="ContentTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" FontFamily="{StaticResource IconFont}" />
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
       <Setter Property="FontSize" Value="14" />
       <Setter Property="Padding" Value="8" />
       <Setter Property="MinWidth" Value="0" />
