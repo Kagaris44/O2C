@@ -100,4 +100,64 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
         Assert.Equal(40001, tcpEvent.RemotePort);
         Assert.True(udpEvent.Time >= started.AddSeconds(-1));
     }
+
+    /// <summary>Диагностика: какие события приходят без аудита и с аудитом «Filtering Platform Connection».</summary>
+    [Fact]
+    public async Task Diagnose_event_sources()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator) ||
+            Environment.GetEnvironmentVariable("CI") != "true")
+        {
+            return;   // меняет политику аудита — только на одноразовой машине CI
+        }
+
+        output.WriteLine("auditpol до: " + Run("auditpol", "/get /subcategory:{0CCE9226-69AE-11D9-BED3-505054503030}"));
+        output.WriteLine("Брандмауэр: " + Run("netsh", "advfirewall show allprofiles state"));
+
+        foreach (var audit in new[] { false, true })
+        {
+            if (audit)
+                output.WriteLine("auditpol вкл: " + Run("auditpol", "/set /subcategory:{0CCE9226-69AE-11D9-BED3-505054503030} /success:enable /failure:enable"));
+
+            var types = new ConcurrentDictionary<int, int>();
+            var connections = new ConcurrentQueue<AppConnection>();
+            using var monitor = new AppConnectionMonitor(connections.Enqueue);
+            monitor.RawEvent += t => types.AddOrUpdate(t, 1, (_, n) => n + 1);
+            monitor.Start();
+            output.WriteLine($"--- аудит {(audit ? "ВКЛ" : "выкл")}: опции после Start = {monitor.Options}");
+            await Task.Delay(500);
+
+            for (int i = 0; i < 3; i++)
+            {
+                using var udp = new UdpClient(AddressFamily.InterNetwork);
+                await udp.SendAsync(new byte[] { 1 }, 1, new IPEndPoint(UdpTarget, 41000 + i));
+            }
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                await http.GetAsync(new Uri("https://www.example.com/"));
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+            }
+
+            await Task.Delay(8000);
+            output.WriteLine($"типы событий: {string.Join(", ", types.Select(kv => $"{kv.Key}={kv.Value}"))}");
+            output.WriteLine($"разрешённых соединений: {connections.Count}");
+            foreach (var c in connections.Take(8))
+                output.WriteLine($"  {c.Protocol} {c.RemoteAddress}:{c.RemotePort} {c.AppPath}");
+        }
+
+        output.WriteLine("Security 5156 за минуту: " + Run("powershell",
+            "-NoProfile -Command \"(Get-WinEvent -FilterHashtable @{LogName='Security';Id=5156;StartTime=(Get-Date).AddMinutes(-1)} -ErrorAction SilentlyContinue).Count\""));
+    }
+
+    private static string Run(string file, string args)
+    {
+        using var p = Process.Start(new ProcessStartInfo(file, args) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false })!;
+        var text = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        return string.Join(" | ", text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
 }

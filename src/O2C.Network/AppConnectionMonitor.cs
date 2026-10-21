@@ -47,6 +47,12 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
 
     public AppConnectionMonitor(Action<AppConnection> onConnection) => _onConnection = onConnection;
 
+    /// <summary>Любое событие движка (тип FWPM_NET_EVENT_TYPE) — для диагностики.</summary>
+    public event Action<int>? RawEvent;
+
+    /// <summary>Текущие значения настроек сбора событий (для диагностики).</summary>
+    public (uint? Collect, uint? Keywords) Options => (GetOption(FWPM_ENGINE_COLLECT_NET_EVENTS), GetOption(FWPM_ENGINE_NET_EVENT_MATCH_ANY_KEYWORDS));
+
     public void Start()
     {
         int error = FwpmEngineOpen0(null, RPC_C_AUTHN_DEFAULT, IntPtr.Zero, IntPtr.Zero, out _engine);
@@ -83,7 +89,9 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
 
     private void Handle(byte* e)
     {
-        if (BinaryPrimitives.ReadInt32LittleEndian(new ReadOnlySpan<byte>(e + HeaderSize, 4)) != FWPM_NET_EVENT_TYPE_CLASSIFY_ALLOW)
+        int type = BinaryPrimitives.ReadInt32LittleEndian(new ReadOnlySpan<byte>(e + HeaderSize, 4));
+        RawEvent?.Invoke(type);
+        if (type != FWPM_NET_EVENT_TYPE_CLASSIFY_ALLOW)
             return;
         uint flags = BinaryPrimitives.ReadUInt32LittleEndian(new ReadOnlySpan<byte>(e + HdrFlags, 4));
         const uint needed = FlagRemoteAddr | FlagAppId;
