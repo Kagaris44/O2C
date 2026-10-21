@@ -73,17 +73,24 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
             throw new IpHelperException(error, "FwpmNetEventSubscribe1");
     }
 
+    /// <summary>Диагностика: сколько раз Windows вызвала обработчик и первая ошибка в нём.</summary>
+    public static int CallbackCount => _callbackCount;
+    public static string? LastCallbackError { get; private set; }
+    private static int _callbackCount;
+
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     private static void OnEvent(IntPtr context, byte* netEvent)
     {
+        Interlocked.Increment(ref _callbackCount);
         try
         {
             if (GCHandle.FromIntPtr(context).Target is AppConnectionMonitor monitor)
                 monitor.Handle(netEvent);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Исключение не должно уйти в RPC-поток Windows.
+            LastCallbackError ??= ex.ToString();
         }
     }
 

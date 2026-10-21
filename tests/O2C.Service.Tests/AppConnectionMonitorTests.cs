@@ -145,6 +145,7 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
             await Task.Delay(8000);
             output.WriteLine($"типы событий: {string.Join(", ", types.Select(kv => $"{kv.Key}={kv.Value}"))}");
             output.WriteLine($"разрешённых соединений: {connections.Count}");
+            output.WriteLine($"вызовов обработчика: {AppConnectionMonitor.CallbackCount}, ошибка: {AppConnectionMonitor.LastCallbackError ?? "нет"}");
             foreach (var c in connections.Take(8))
                 output.WriteLine($"  {c.Protocol} {c.RemoteAddress}:{c.RemotePort} {c.AppPath}");
         }
