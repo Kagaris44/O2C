@@ -22,9 +22,13 @@ public static class ExclusionTextEditor
         int duplicates = 0;
 
         // Комментарий во вставленном тексте отбрасываем построчно, затем режем по разделителям.
+        // Строку-путь (C:\Program Files\...) не режем: в путях бывают пробелы и запятые.
         var tokens = input.Split('\n')
-            .Select(line => line.Split('#')[0])
-            .SelectMany(line => line.Split(Separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            .Select(line => ExclusionParser.StripComment(line).Trim())
+            .Where(line => line.Length > 0)
+            .SelectMany(line => ExclusionParser.LooksLikePath(line)
+                ? [line]
+                : line.Split(Separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         foreach (var token in tokens)
         {
@@ -59,7 +63,7 @@ public static class ExclusionTextEditor
         var kept = new List<string>();
         foreach (var line in (text ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
-            var value = line.Split('#')[0].Trim();
+            var value = ExclusionParser.StripComment(line).Trim();
             bool match = value.Length > 0 &&
                 (string.Equals(value, entry.Trim(), StringComparison.OrdinalIgnoreCase) ||
                  (target is not null && string.Equals(NormalizedText(value), target, StringComparison.OrdinalIgnoreCase)));

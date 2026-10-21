@@ -125,6 +125,36 @@ public partial class MainWindow : Window
         await AddExclusionsAsync(text);
     }
 
+    private void OnAddAppClick(object sender, RoutedEventArgs e)
+    {
+        var menu = AddAppButton.ContextMenu;
+        menu.PlacementTarget = AddAppButton;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private async void OnAddAppFileClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Программа, соединения которой пойдут мимо туннеля",
+            Filter = "Программы (*.exe)|*.exe",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(this) == true)
+            await AddExclusionsAsync(dialog.FileName);
+    }
+
+    private async void OnAddAppFolderClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Папка: соединения всех программ из неё пойдут мимо туннеля",
+        };
+        if (dialog.ShowDialog(this) == true)
+            await AddExclusionsAsync(dialog.FolderName);
+    }
+
     private async Task AddExclusionsAsync(string input)
     {
         if (string.IsNullOrWhiteSpace(input))

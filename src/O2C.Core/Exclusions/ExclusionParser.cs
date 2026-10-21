@@ -14,6 +14,12 @@ public enum ExclusionKind
 
     /// <summary>Маска *.example.com — сам домен и все поддомены; адреса берутся из журнала DNS-клиента.</summary>
     Wildcard,
+
+    /// <summary>
+    /// Программа (путь к .exe) или папка с программами: адреса, к которым они обращаются,
+    /// служба узнаёт из событий ядра Windows и запоминает на 7 дней.
+    /// </summary>
+    Application,
 }
 
 public sealed record ExclusionEntry
@@ -24,6 +30,11 @@ public sealed record ExclusionEntry
     public IPAddress? Address { get; init; }
     public int PrefixLength { get; init; }
     public string? Host { get; init; }
+
+    /// <summary>Для <see cref="ExclusionKind.Application"/>: полный путь к .exe или к папке (с завершающим «\»).</summary>
+    public string? AppPath { get; init; }
+
+    public bool IsFolder => Kind == ExclusionKind.Application && AppPath is { } p && p.EndsWith('\\');
 }
 
 public sealed record ExclusionError(int Line, string Text, string Message);
@@ -31,9 +42,9 @@ public sealed record ExclusionError(int Line, string Text, string Message);
 public sealed record ExclusionParseResult(IReadOnlyList<ExclusionEntry> Entries, IReadOnlyList<ExclusionError> Errors);
 
 /// <summary>
-/// Разбирает список исключений: по одной записи на строку, «#» — комментарий.
-/// Запись — IPv4/IPv6-адрес, подсеть в формате адрес/длина, доменное имя (можно вставить URL)
-/// или маска *.example.com.
+/// Разбирает список исключений: по одной записи на строку; «#» в начале строки или после пробела — комментарий.
+/// Запись — IPv4/IPv6-адрес, подсеть в формате адрес/длина, доменное имя (можно вставить URL),
+/// маска *.example.com, путь к программе (C:\...\app.exe) или к папке с программами (C:\...\).
 /// </summary>
 public static partial class ExclusionParser
 {
@@ -52,9 +63,7 @@ public static partial class ExclusionParser
         var lines = (text ?? "").Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {
-            var raw = lines[i];
-            var hash = raw.IndexOf('#', StringComparison.Ordinal);
-            var value = (hash >= 0 ? raw[..hash] : raw).Trim();
+            var value = StripComment(lines[i]).Trim();
             if (value.Length == 0)
                 continue;
 
@@ -77,8 +86,55 @@ public static partial class ExclusionParser
         return new ExclusionParseResult(entries, errors);
     }
 
+    /// <summary>
+    /// Убирает комментарий: «#» в начале строки или после пробела. «#» внутри пути (C:\Games\C#\) остаётся.
+    /// </summary>
+    public static string StripComment(string line)
+    {
+        for (int i = 0; i < line.Length; i++)
+        {
+            if (line[i] == '#' && (i == 0 || char.IsWhiteSpace(line[i - 1])))
+                return line[..i];
+        }
+        return line;
+    }
+
+    /// <summary>Похоже ли значение на путь Windows (C:\..., «C:\...» в кавычках).</summary>
+    public static bool LooksLikePath(string value)
+    {
+        value = value.Trim().Trim('"');
+        return value.Length >= 3 && char.IsAsciiLetter(value[0]) && value[1] == ':' && value[2] is '\\' or '/';
+    }
+
+    private static (ExclusionEntry? Entry, string? Error) ParseApplication(string value)
+    {
+        value = value.Trim().Trim('"').Replace('/', '\\');
+        if (value.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || value.Contains('*', StringComparison.Ordinal) || value.Contains('?', StringComparison.Ordinal))
+            return (null, "Некорректный путь.");
+        string full;
+        try
+        {
+            full = Path.GetFullPath(value);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return (null, "Некорректный путь.");
+        }
+
+        if (full.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            return (new ExclusionEntry { Kind = ExclusionKind.Application, AppPath = full, Text = full }, null);
+
+        var folder = full.TrimEnd('\\') + "\\";
+        if (folder.Length <= 3)
+            return (null, "Укажите папку с программой, а не весь диск.");
+        return (new ExclusionEntry { Kind = ExclusionKind.Application, AppPath = folder, Text = folder }, null);
+    }
+
     private static (ExclusionEntry? Entry, string? Error) ParseOne(string value)
     {
+        if (LooksLikePath(value))
+            return ParseApplication(value);
+
         if (value.StartsWith("*.", StringComparison.Ordinal))
         {
             var domain = value[2..].TrimEnd('.').ToLowerInvariant();
@@ -126,6 +182,9 @@ public static partial class ExclusionParser
 
         if (slash >= 0)
             return (null, "Некорректная подсеть.");
+
+        if (value.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            return (null, @"Укажите полный путь к программе (C:\...\app.exe) или выберите её кнопкой «Добавить программу».");
 
         var host = value.TrimEnd('.').ToLowerInvariant();
         if (!HostRegex().IsMatch(host))

@@ -59,6 +59,15 @@ internal sealed class ExclusionManager : BackgroundService
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<IPAddress, DateTime>> _learned = new(StringComparer.OrdinalIgnoreCase);
 
     private DnsClientWatcher? _dnsWatcher;
+
+    /// <summary>Наблюдение за соединениями программ (события ядра) — пока есть подключение и записи программ.</summary>
+    private AppConnectionMonitor? _appMonitor;
+
+    /// <summary>Адреса программ из списка: хранятся 7 дней и между перезапусками службы.</summary>
+    private readonly AppAddressBook _apps = LoadApps();
+    private DateTime _appsSavedAt = DateTime.MinValue;
+    private static readonly TimeSpan AppsSaveInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan AppsTouchInterval = TimeSpan.FromMinutes(1);
     private CancellationTokenSource? _networkDebounce;
 
     public ExclusionManager(ConnectionManager connection, SettingsStore settings, LogBuffer log, ILogger<ExclusionManager> logger)
@@ -91,6 +100,8 @@ internal sealed class ExclusionManager : BackgroundService
 
         using var timer = new PeriodicTimer(RefreshInterval);
         var tick = TickAsync(timer, stoppingToken);
+        using var appTimer = new PeriodicTimer(AppsTouchInterval);
+        var appTick = AppTickAsync(appTimer, stoppingToken);
         try
         {
             await foreach (var _ in _triggers.Reader.ReadAllAsync(stoppingToken))
@@ -115,8 +126,132 @@ internal sealed class ExclusionManager : BackgroundService
             _settings.ExclusionsChanged -= Trigger;
             NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
             await tick;
+            await appTick;
             _dnsWatcher?.Dispose();
+            _appMonitor?.Dispose();
+            SaveApps(force: true);
             RemoveAll();
+        }
+    }
+
+    /// <summary>Раз в минуту: продлить срок адресов запущенных программ и сохранить адреса на диск.</summary>
+    private async Task AppTickAsync(PeriodicTimer timer, CancellationToken ct)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                try
+                {
+                    if (_active)
+                        TouchRunningApps();
+                    SaveApps(force: false);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    _logger.LogWarning(ex, "Не удалось обновить адреса программ");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void TouchRunningApps()
+    {
+        var apps = _entries.Where(e => e.Kind == ExclusionKind.Application).ToList();
+        if (apps.Count == 0)
+            return;
+        var running = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var process in System.Diagnostics.Process.GetProcesses())
+        {
+            using (process)
+            {
+                if (AppConnectionMonitor.GetProcessPath(process.Id) is { } path)
+                    running.Add(path);
+            }
+        }
+        var now = DateTime.UtcNow;
+        foreach (var entry in apps)
+        {
+            if (running.Any(path => DnsNames.MatchesApp(entry, path)))
+                _apps.Touch(entry.Text, now);
+        }
+    }
+
+    private static AppAddressBook LoadApps()
+    {
+        try
+        {
+            if (File.Exists(ServicePaths.AppAddressesFile))
+                return AppAddressBook.Deserialize(File.ReadAllText(ServicePaths.AppAddressesFile));
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Повреждённый файл — начинаем с пустого списка: адреса соберутся заново.
+        }
+        return new AppAddressBook();
+    }
+
+    private void SaveApps(bool force)
+    {
+        if (!_apps.Dirty || (!force && DateTime.UtcNow - _appsSavedAt < AppsSaveInterval))
+            return;
+        try
+        {
+            var tmp = ServicePaths.AppAddressesFile + ".tmp";
+            File.WriteAllText(tmp, _apps.Serialize());
+            File.Move(tmp, ServicePaths.AppAddressesFile, overwrite: true);
+            _appsSavedAt = DateTime.UtcNow;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Не удалось сохранить адреса программ");
+        }
+    }
+
+    /// <summary>Программа обратилась к адресу. Если она в списке — запоминаем адрес и ставим маршрут.</summary>
+    private void OnAppConnection(AppConnection connection)
+    {
+        if (!_active || IPAddress.IsLoopback(connection.RemoteAddress) || connection.RemoteAddress.Equals(IPAddress.Any))
+            return;
+        bool anyNew = false;
+        foreach (var entry in _entries)
+        {
+            if (!DnsNames.MatchesApp(entry, connection.AppPath))
+                continue;
+            if (_apps.Learn(entry.Text, connection.RemoteAddress, connection.Time))
+            {
+                anyNew = true;
+                var proto = connection.Protocol == 6 ? "TCP" : "UDP";
+                _log.Add($"Программа: {Path.GetFileName(connection.AppPath)} → {connection.RemoteAddress}:{connection.RemotePort} {proto} (исключение {entry.Text})");
+            }
+        }
+        if (anyNew)
+            TriggerFast();
+    }
+
+    private void UpdateAppMonitor(bool needed)
+    {
+        try
+        {
+            if (needed && _appMonitor is null)
+            {
+                var monitor = new AppConnectionMonitor(OnAppConnection);
+                monitor.Start();
+                _appMonitor = monitor;
+            }
+            else if (!needed && _appMonitor is not null)
+            {
+                _appMonitor.Dispose();
+                _appMonitor = null;
+            }
+        }
+        catch (IpHelperException ex)
+        {
+            _logger.LogWarning(ex, "Наблюдение за программами недоступно");
+            _log.Add($"Наблюдение за программами недоступно: {ex.Message}. Исключения программ работают по запомненным адресам.");
         }
     }
 
@@ -250,7 +385,10 @@ internal sealed class ExclusionManager : BackgroundService
         _entries = parsed.Entries;
         bool resolve = Interlocked.Exchange(ref _needResolve, 0) == 1;
         UpdateDnsWatcher(_active && parsed.Entries.Any(e => e.Kind is ExclusionKind.Host or ExclusionKind.Wildcard));
+        UpdateAppMonitor(_active && parsed.Entries.Any(e => e.Kind == ExclusionKind.Application));
         PruneLearned();
+        _apps.Prune(DateTime.UtcNow, parsed.Entries.Where(e => e.Kind == ExclusionKind.Application)
+            .Select(e => e.Text).ToHashSet(StringComparer.OrdinalIgnoreCase));
 
         if (!_active)
         {
@@ -299,10 +437,13 @@ internal sealed class ExclusionManager : BackgroundService
             {
                 Entry = entry.Text,
                 Routes = itemRoutes.Count <= 10 ? itemRoutes : [.. itemRoutes.Take(10), $"…ещё {itemRoutes.Count - 10}"],
-                Error = itemRoutes.Count > 0 || entry.Kind == ExclusionKind.Wildcard ? null : error,
-                Note = itemRoutes.Count == 0 && entry.Kind == ExclusionKind.Wildcard
-                    ? "Ждёт обращений: адреса появятся, когда приложение откроет такой домен."
-                    : null,
+                Error = itemRoutes.Count > 0 || entry.Kind is ExclusionKind.Wildcard or ExclusionKind.Application ? null : error,
+                Note = itemRoutes.Count > 0 ? null : entry.Kind switch
+                {
+                    ExclusionKind.Wildcard => "Ждёт обращений: адреса появятся, когда приложение откроет такой домен.",
+                    ExclusionKind.Application => "Ждёт: адреса появятся, когда программа начнёт работать с сетью (хранятся 7 дней).",
+                    _ => null,
+                },
             });
         }
 
@@ -320,6 +461,9 @@ internal sealed class ExclusionManager : BackgroundService
     {
         if (entry.Kind == ExclusionKind.Network)
             return ([(entry.Address!, entry.PrefixLength)], null);
+
+        if (entry.Kind == ExclusionKind.Application)
+            return ([.. _apps.Get(entry.Text).Select(a => (a, a.AddressFamily == AddressFamily.InterNetwork ? 32 : 128))], null);
 
         // Адреса из журнала DNS: для масок — единственный источник, для доменов — дополнение.
         List<IPAddress> learned = _learned.TryGetValue(entry.Text, out var seen) ? [.. seen.Keys] : [];

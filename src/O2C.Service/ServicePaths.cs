@@ -18,6 +18,9 @@ internal static class ServicePaths
 
     /// <summary>Маршруты-исключения, поставленные службой, — чтобы снять их после аварийного завершения.</summary>
     public static string RoutesStateFile => Path.Combine(DataDirectory, "routes.json");
+
+    /// <summary>Адреса, к которым обращались программы из списка исключений (хранятся 7 дней).</summary>
+    public static string AppAddressesFile => Path.Combine(DataDirectory, "app-addresses.json");
     public static string LogDirectory => ProductPaths.LogDirectory;
     public static string ServiceLogFile => Path.Combine(LogDirectory, "service.log");
     public static string OpenConnectLogFile => Path.Combine(LogDirectory, "openconnect.log");

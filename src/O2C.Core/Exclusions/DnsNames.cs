@@ -27,6 +27,18 @@ public static class DnsNames
     }
 
     /// <summary>
+    /// Подходит ли программа к записи: для .exe — тот же путь, для папки — программа в ней или во вложенных папках.
+    /// </summary>
+    public static bool MatchesApp(ExclusionEntry entry, string appPath)
+    {
+        if (entry.Kind != ExclusionKind.Application || entry.AppPath is not { } path)
+            return false;
+        return entry.IsFolder
+            ? appPath.StartsWith(path, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(appPath, path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Разбирает поле QueryResults журнала Microsoft-Windows-DNS-Client: записи через «;»,
     /// адреса IPv4 — в виде ::ffff:a.b.c.d, псевдонимы — «type:  5 alias.example.com».
     /// </summary>
