@@ -8,6 +8,7 @@
   <Grid Margin="14,10,14,12">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -19,7 +20,10 @@
                  VerticalAlignment="Center" Style="{StaticResource Caption}" />
     </Grid>
 
-    <ListBox x:Name="AppList" Grid.Row="1" Margin="0,8,0,0" MouseDoubleClick="OnListDoubleClick"
+    <CheckBox x:Name="ShowBackground" Grid.Row="1" Margin="0,8,0,0" Content="Показать фоновые (без окна, например в области уведомлений)"
+              Checked="OnShowBackgroundChanged" Unchecked="OnShowBackgroundChanged" />
+
+    <ListBox x:Name="AppList" Grid.Row="2" Margin="0,8,0,0" MouseDoubleClick="OnListDoubleClick"
              SelectionChanged="OnSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.ItemTemplate>
         <DataTemplate DataType="{x:Type local:RunningApp}">
@@ -36,23 +40,25 @@
               </TextBlock>
               <TextBlock Text="{Binding Details}" FontSize="11" TextTrimming="CharacterEllipsis"
                          Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBlock Text="{Binding FolderHint}" Visibility="{Binding FolderHintVisibility}" FontSize="11"
+                         TextWrapping="Wrap" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
             </StackPanel>
           </Grid>
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <TextBlock x:Name="StatusText" Grid.Row="2" Style="{StaticResource Caption}" Margin="2,6,0,0"
+    <TextBlock x:Name="StatusText" Grid.Row="3" Style="{StaticResource Caption}" Margin="2,6,0,0"
                Text="Загрузка списка…" />
 
-    <DockPanel Grid.Row="3" Margin="0,10,0,0" LastChildFill="False">
+    <DockPanel Grid.Row="4" Margin="0,10,0,0" LastChildFill="False">
       <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="Обновить список"
               Click="OnRefreshClick" />
       <Button DockPanel.Dock="Right" Content="Отмена" IsCancel="True" Margin="8,0,0,0" MinWidth="90" />
       <Button x:Name="AddFileButton" DockPanel.Dock="Right" Content="Добавить" IsDefault="True" MinWidth="90"
               IsEnabled="False" Click="OnAddFileClick" ToolTip="Добавить эту программу" />
       <Button x:Name="AddFolderButton" DockPanel.Dock="Right" Content="Её папку" Margin="0,0,8,0"
-              IsEnabled="False" Click="OnAddFolderClick" ToolTip="Добавить папку программы: все программы в ней" />
+              IsEnabled="False" Click="OnAddFolderClick" />
     </DockPanel>
   </Grid>
 </Window>

@@ -30,15 +30,22 @@ public partial class RunningAppPicker : Window
     private void ApplyFilter()
     {
         var filter = FilterInput.Text.Trim();
-        var items = filter.Length == 0 ? _all : [.. _all.Where(a =>
-            a.Path.Contains(filter, StringComparison.CurrentCultureIgnoreCase) ||
-            a.Description.Contains(filter, StringComparison.CurrentCultureIgnoreCase))];
+        bool background = ShowBackground.IsChecked == true;
+        List<RunningApp> items = [.. _all.Where(a =>
+            (background || a.HasWindow) &&
+            (filter.Length == 0 ||
+             a.Path.Contains(filter, StringComparison.CurrentCultureIgnoreCase) ||
+             a.Description.Contains(filter, StringComparison.CurrentCultureIgnoreCase)))];
         AppList.ItemsSource = items;
         if (items.Count > 0)
             AppList.SelectedIndex = 0;
+        int hidden = _all.Count(a => !a.HasWindow);
         StatusText.Text = _all.Count == 0
             ? "Не удалось получить список программ."
-            : $"Программ: {items.Count}. Сначала — с открытыми окнами. Программы, запущенные от администратора, могут не отображаться.";
+            : (background
+                ? $"Программ: {items.Count}, сначала — с окнами."
+                : $"Приложений с окнами: {items.Count}. Фоновых скрыто: {hidden}.") +
+              " Программы, запущенные от администратора, могут не отображаться — их можно выбрать как файл.";
     }
 
     private void OnFilterChanged(object sender, TextChangedEventArgs e)
@@ -49,9 +56,16 @@ public partial class RunningAppPicker : Window
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        bool any = AppList.SelectedItem is RunningApp;
-        AddFileButton.IsEnabled = any;
-        AddFolderButton.IsEnabled = any;
+        var app = AppList.SelectedItem as RunningApp;
+        AddFileButton.IsEnabled = app is not null;
+        AddFolderButton.IsEnabled = app is not null;
+        AddFolderButton.ToolTip = app is null ? null : $"Добавить папку {app.Folder}: все программы в ней";
+    }
+
+    private void OnShowBackgroundChanged(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded)
+            ApplyFilter();
     }
 
     private async void OnRefreshClick(object sender, RoutedEventArgs e) => await LoadAsync();
@@ -66,7 +80,7 @@ public partial class RunningAppPicker : Window
     {
         if (AppList.SelectedItem is not RunningApp app)
             return;
-        SelectedPath = folder ? Path.GetDirectoryName(app.Path) + Path.DirectorySeparatorChar : app.Path;
+        SelectedPath = folder ? app.Folder : app.Path;
         DialogResult = true;
     }
 }
