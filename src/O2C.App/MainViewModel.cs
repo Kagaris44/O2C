@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Media;
 using O2C.Core;
 using O2C.Core.Exclusions;
+using O2C.Core.Updates;
 
 namespace O2C.App;
 
@@ -31,8 +32,42 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     private string _newExclusion = "";
     private string _exclusionsMessage = "";
     private string _exclusionsSummary = "";
+    private ReleaseInfo? _update;
+    private int _updateProgress = -1;
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    // ---------- Обновление ----------
+
+    public ReleaseInfo? Update
+    {
+        get => _update;
+        set
+        {
+            if (Set(ref _update, value))
+            {
+                OnPropertyChanged(nameof(UpdateVisibility));
+                OnPropertyChanged(nameof(UpdateTooltip));
+            }
+        }
+    }
+
+    /// <summary>Процент загрузки установщика; -1 — загрузки нет.</summary>
+    public int UpdateProgress
+    {
+        get => _updateProgress;
+        set
+        {
+            if (Set(ref _updateProgress, value))
+                OnPropertyChanged(nameof(UpdateTooltip));
+        }
+    }
+
+    public Visibility UpdateVisibility => Update is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string UpdateTooltip => Update is null ? ""
+        : UpdateProgress >= 0 ? $"Загрузка версии {Update.Version.ToString(3)}: {UpdateProgress}%"
+        : $"Доступна версия {Update.Version.ToString(3)} (установлена {UpdateChecker.CurrentVersion.ToString(3)}). Нажмите, чтобы обновиться.";
 
     // ---------- Подключение ----------
 

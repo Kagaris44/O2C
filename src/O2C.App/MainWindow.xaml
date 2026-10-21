@@ -41,7 +41,20 @@
             </ControlTemplate>
           </Button.Template>
         </Button>
-        <TextBlock Text="{Binding StateText}" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,10,0,0" />
+        <!-- Значок обновления справа от состояния; ширина-противовес слева держит надпись по центру -->
+        <Grid HorizontalAlignment="Center" Margin="0,10,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <Border Width="{Binding ActualWidth, ElementName=UpdateButton}" Visibility="{Binding UpdateVisibility}" />
+          <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button x:Name="UpdateButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE896;"
+                  Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="4,0,0,0" Padding="6"
+                  Visibility="{Binding UpdateVisibility}" ToolTip="{Binding UpdateTooltip}"
+                  AutomationProperties.Name="Обновить OpenToConnect" Click="OnUpdateClick" />
+        </Grid>
         <TextBlock Text="{Binding StateDetails}" Style="{StaticResource Caption}" HorizontalAlignment="Center"
                    TextAlignment="Center" MaxWidth="320" Margin="0,2,0,0" />
       </StackPanel>

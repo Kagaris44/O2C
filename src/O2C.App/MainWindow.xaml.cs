@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -16,6 +18,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm = new();
     private readonly PipeClient _client = new();
     private readonly TrayIcon _tray;
+    private readonly UpdateChecker _updates = new();
     private readonly DispatcherTimer _timer;
     private string? _newPassword;
     private bool _exiting;
@@ -38,6 +41,57 @@ public partial class MainWindow : Window
         _client.ExclusionsReceived += report => Dispatcher.InvokeAsync(() => _vm.ApplyExclusionReport(report));
         _client.Start();
         UpdateTray();
+
+        _updates.UpdateFound += release => Dispatcher.InvokeAsync(() => _vm.Update = release);
+        _updates.Start();
+    }
+
+    // ---------- Обновление ----------
+
+    private async void OnUpdateClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm.Update is not { } release || _vm.UpdateProgress >= 0)
+            return;
+
+        var version = release.Version.ToString(3);
+        if (release.MsiUrl is null)
+        {
+            if (MessageBox.Show(this, $"Доступна версия {version}. Открыть страницу загрузки?", "OpenToConnect",
+                    MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                UpdateChecker.OpenPage(release);
+            return;
+        }
+
+        var answer = MessageBox.Show(this,
+            $"""
+            Доступна версия {version} (установлена {UpdateChecker.CurrentVersion.ToString(3)}).
+
+            «Да» — скачать и установить. Windows запросит права администратора; подключение на время установки прервётся.
+            «Нет» — открыть страницу версии со списком изменений.
+            """,
+            "OpenToConnect", MessageBoxButton.YesNoCancel, MessageBoxImage.Information);
+        if (answer == MessageBoxResult.No)
+        {
+            UpdateChecker.OpenPage(release);
+            return;
+        }
+        if (answer != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            _vm.UpdateProgress = 0;
+            await _updates.DownloadAndInstallAsync(release, new Progress<int>(p => _vm.UpdateProgress = p), CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
+                                       or UnauthorizedAccessException or System.ComponentModel.Win32Exception or TaskCanceledException)
+        {
+            MessageBox.Show(this, $"Не удалось обновить: {ex.Message}", "OpenToConnect", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _vm.UpdateProgress = -1;
+        }
     }
 
     /// <summary>Показать окно (из значка в области уведомлений или при повторном запуске программы).</summary>
