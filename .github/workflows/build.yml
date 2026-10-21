@@ -108,9 +108,9 @@ jobs:
           if (-not (Test-Path $msi)) { throw "Не найден $msi" }
           $hash = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
 
-          # Примечания к релизу — раздел этой версии из истории изменений в README.
-          $readme = Get-Content README.md -Raw
-          $m = [regex]::Match($readme, "(?ms)^### $([regex]::Escape($version))\b.*?\r?\n(.*?)(?=^### |^## |\z)")
+          # Примечания к релизу — раздел этой версии из CHANGELOG.md.
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $m = [regex]::Match($changelog, "(?ms)^## $([regex]::Escape($version))\b.*?\r?\n(.*?)(?=^## |\z)")
           $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "OpenToConnect $version" }
           $notes += "`n`nSHA-256 ``OpenToConnect-$version.msi``: ``$hash``"
           Set-Content notes.md $notes

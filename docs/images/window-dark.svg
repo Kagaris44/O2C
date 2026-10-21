@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="428" height="648" viewBox="0 0 428 648" font-family="'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif" role="img" aria-label="Окно OpenToConnect">
+<defs><filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#000" flood-opacity="0.5"/></filter><clipPath id="win"><rect x="24" y="24" width="380" height="600" rx="8"/></clipPath></defs>
+<rect x="24" y="24" width="380" height="600" rx="8" fill="#202020" filter="url(#sh)"/>
+<rect x="24.5" y="24.5" width="379" height="599" rx="8" fill="none" stroke="#383838"/>
+<image href="data:image/png;base64,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" x="36" y="33" width="16" height="16"/>
+<text x="60" y="45" font-size="12" font-weight="400" fill="#FFFFFF" text-anchor="start">OpenToConnect</text>
+<line x1="284" y1="41" x2="294" y2="41" stroke="#FFFFFF" stroke-width="1"/>
+<rect x="330" y="36" width="10" height="10" rx="1.5" fill="none" stroke="#FFFFFF" stroke-width="1"/>
+<line x1="376" y1="36" x2="386" y2="46" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="376" y1="46" x2="386" y2="36" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(0 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(45 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(90 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(135 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(180 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(225 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(270 374 76)"/><rect x="372.4" y="67.5" width="3.2" height="4" rx="0.8" fill="#FFFFFF" transform="rotate(315 374 76)"/><circle cx="374" cy="76" r="5.6" fill="none" stroke="#FFFFFF" stroke-width="1.6"/><circle cx="374" cy="76" r="2.2" fill="none" stroke="#FFFFFF" stroke-width="1.4"/>
+<circle cx="214.0" cy="138" r="56" fill="none" stroke="#2EA043" stroke-width="4"/>
+<path d="M200.1,130.0 A16,16 0 1 1 200.1,146.0" fill="none" stroke="#2EA043" stroke-width="3.4" stroke-linecap="round"/><line x1="214.0" y1="118" x2="214.0" y2="136" stroke="#2EA043" stroke-width="3.4" stroke-linecap="round"/>
+<text x="214.0" y="226" font-size="17" font-weight="600" fill="#FFFFFF" text-anchor="middle">Подключено</text>
+<rect x="274.0" y="207" width="26" height="26" rx="4" fill="#2D2D2D"/>
+<line x1="287.0" y1="213" x2="287.0" y2="223" stroke="#60CDFF" stroke-width="1.7" stroke-linecap="round"/><polyline points="282.5,218.5 287.0,223 291.5,218.5" fill="none" stroke="#60CDFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="281.0" y1="227" x2="293.0" y2="227" stroke="#60CDFF" stroke-width="1.7" stroke-linecap="round"/>
+<text x="214.0" y="246" font-size="12" font-weight="400" fill="#C5C5C5" text-anchor="middle">10.10.0.5 · 01:24:07</text>
+<text x="48" y="278" font-size="14" font-weight="600" fill="#FFFFFF" text-anchor="start">Исключения</text>
+<rect x="72" y="287" width="28" height="3" rx="1.5" fill="#60CDFF"/>
+<text x="150" y="278" font-size="14" font-weight="400" fill="#C5C5C5" text-anchor="start">Журнал</text>
+<rect x="38" y="304" width="244" height="32" rx="4" fill="#2D2D2D" stroke="#454545"/>
+<line x1="39" y1="335.5" x2="281" y2="335.5" stroke="#C5C5C5" stroke-width="1"/>
+<text x="50" y="325" font-size="12" font-weight="400" fill="#C5C5C5" text-anchor="start">example.com, 1.2.3.4, *.site.ru</text>
+<line x1="298" y1="320" x2="310" y2="320" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/><line x1="304" y1="314" x2="304" y2="326" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="334.5" y="315" width="11" height="13" rx="1.8" fill="none" stroke="#FFFFFF" stroke-width="1.3"/><rect x="337" y="313" width="6" height="3.6" rx="1" fill="#FFFFFF"/>
+<rect x="369.5" y="314.75" width="13.0" height="10.5" rx="1.6" fill="none" stroke="#FFFFFF" stroke-width="1.3"/><line x1="369.5" y1="317.75" x2="382.5" y2="317.75" stroke="#FFFFFF" stroke-width="1.3"/>
+<text x="40" y="356" font-size="12" font-weight="400" fill="#C5C5C5" text-anchor="start">Добавлено: C:\Program Files (x86)\Steam\</text>
+<circle cx="44" cy="387" r="4" fill="#2EA043"/>
+<text x="58" y="391.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">example.com</text>
+<text x="356" y="391" font-size="12" font-weight="400" fill="#2EA043" text-anchor="end">2</text>
+<line x1="372.6" y1="383.6" x2="379.4" y2="390.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="390.4" x2="379.4" y2="383.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="404.5" x2="390" y2="404.5" stroke="#383838"/>
+<circle cx="44" cy="422" r="4" fill="#2EA043"/>
+<text x="58" y="426.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">*.example.org</text>
+<text x="356" y="426" font-size="12" font-weight="400" fill="#2EA043" text-anchor="end">5</text>
+<line x1="372.6" y1="418.6" x2="379.4" y2="425.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="425.4" x2="379.4" y2="418.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="439.5" x2="390" y2="439.5" stroke="#383838"/>
+<circle cx="44" cy="457" r="4" fill="#2EA043"/>
+<rect x="58.475" y="452.5375" width="11.049999999999999" height="8.924999999999999" rx="1.36" fill="none" stroke="#FFFFFF" stroke-width="1.3"/><line x1="58.475" y1="455.08750000000003" x2="69.525" y2="455.08750000000003" stroke="#FFFFFF" stroke-width="1.3"/>
+<text x="78" y="461.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">foo.exe</text>
+<text x="356" y="461" font-size="12" font-weight="400" fill="#2EA043" text-anchor="end">12</text>
+<line x1="372.6" y1="453.6" x2="379.4" y2="460.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="460.4" x2="379.4" y2="453.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="474.5" x2="390" y2="474.5" stroke="#383838"/>
+<circle cx="44" cy="492" r="4" fill="#2EA043"/>
+<path d="M57.5,487.5 h4.5 l1.6,1.8 h7 a1,1 0 0 1 1,1 v6.7 a1,1 0 0 1 -1,1 h-12.1 a1,1 0 0 1 -1,-1 z" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linejoin="round"/>
+<text x="78" y="496.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">Steam\</text>
+<text x="356" y="496" font-size="12" font-weight="400" fill="#2EA043" text-anchor="end">8</text>
+<line x1="372.6" y1="488.6" x2="379.4" y2="495.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="495.4" x2="379.4" y2="488.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="509.5" x2="390" y2="509.5" stroke="#383838"/>
+<circle cx="44" cy="527" r="4" fill="#2EA043"/>
+<text x="58" y="531.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">203.0.113.0/24</text>
+<text x="356" y="531" font-size="12" font-weight="400" fill="#2EA043" text-anchor="end">1</text>
+<line x1="372.6" y1="523.6" x2="379.4" y2="530.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="530.4" x2="379.4" y2="523.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="544.5" x2="390" y2="544.5" stroke="#383838"/>
+<circle cx="44" cy="562" r="4" fill="#8A8A8A"/>
+<text x="58" y="566.5" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="start">*.cdn.example.net</text>
+<text x="356" y="566" font-size="12" font-weight="400" fill="#8A8A8A" text-anchor="end">ждёт</text>
+<line x1="372.6" y1="558.6" x2="379.4" y2="565.4" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/><line x1="372.6" y1="565.4" x2="379.4" y2="558.6" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="38" y1="579.5" x2="390" y2="579.5" stroke="#383838"/>
+<text x="40" y="608" font-size="12" font-weight="400" fill="#C5C5C5" text-anchor="start">Мимо туннеля: 28 маршрутов</text>
+</svg>
