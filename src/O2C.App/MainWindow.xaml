@@ -79,6 +79,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <TextBox x:Name="NewExclusionInput" Text="{Binding NewExclusion, UpdateSourceTrigger=PropertyChanged}"
                        KeyDown="OnNewExclusionKeyDown" />
@@ -89,6 +90,15 @@
                       ToolTip="Добавить (Enter)" Click="OnAddExclusionClick" />
               <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE77F;"
                       ToolTip="Вставить списком из буфера обмена" Click="OnPasteExclusionsClick" />
+              <Button x:Name="AddAppButton" Grid.Column="3" Style="{StaticResource IconButton}" Content="&#xE737;"
+                      ToolTip="Добавить программу или папку: её соединения пойдут мимо туннеля" Click="OnAddAppClick">
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Программа (.exe)…" Click="OnAddAppFileClick" />
+                    <MenuItem Header="Папка с программами…" Click="OnAddAppFolderClick" />
+                  </ContextMenu>
+                </Button.ContextMenu>
+              </Button>
             </Grid>
             <TextBlock Grid.Row="1" Text="{Binding ExclusionsMessage}" Style="{StaticResource Caption}" Margin="2,4,0,4" />
 
@@ -96,12 +106,12 @@
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
               <Grid>
                 <TextBlock Visibility="{Binding EmptyListVisibility}" Style="{StaticResource Caption}" Margin="2,8,0,0"
-                           Text="Здесь будут адреса, которые идут напрямую, мимо туннеля. Добавьте IP, подсеть, домен или маску *.домен." />
+                           Text="Здесь будут адреса, которые идут напрямую, мимо туннеля. Добавьте IP, подсеть, домен, маску *.домен или программу." />
                 <ItemsControl ItemsSource="{Binding ExclusionRows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                              Padding="2,6" ToolTip="{Binding Tooltip}" Background="Transparent">
+                              Padding="2,6" ToolTip="{Binding FullTooltip}" Background="Transparent">
                         <Grid>
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -110,7 +120,12 @@
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
                           <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                          <TextBlock Grid.Column="1" Text="{Binding Entry}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Icon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
+                                       VerticalAlignment="Center" Margin="0,0,6,0"
+                                       Visibility="{Binding IconVisibility}" />
+                            <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
                           <TextBlock Grid.Column="2" Text="{Binding Tag}" Foreground="{Binding TagBrush}" FontSize="12"
                                      VerticalAlignment="Center" Margin="8,0" />
                           <Button Grid.Column="3" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="10" Padding="6"
