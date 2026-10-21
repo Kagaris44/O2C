@@ -51,6 +51,9 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
     public event Action<int>? RawEvent;
 
     /// <summary>Текущие значения настроек сбора событий (для диагностики).</summary>
+    /// <summary>Диагностика: 0 — без шаблона отбора, 1 — пустой шаблон, 2 — шаблон с интервалом времени.</summary>
+    public int TemplateMode { get; init; }
+
     public (uint? Collect, uint? Keywords) Options => (GetOption(FWPM_ENGINE_COLLECT_NET_EVENTS), GetOption(FWPM_ENGINE_NET_EVENT_MATCH_ANY_KEYWORDS));
 
     public void Start()
@@ -65,12 +68,77 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
         SetOption(FWPM_ENGINE_NET_EVENT_MATCH_ANY_KEYWORDS, (_previousKeywords ?? 0) | FWPM_NET_EVENT_KEYWORD_CLASSIFY_ALLOW);
 
         _self = GCHandle.Alloc(this);
-        // FWPM_NET_EVENT_SUBSCRIPTION0: enumTemplate = NULL (все события), flags = 0, sessionKey = 0.
+        // FWPM_NET_EVENT_SUBSCRIPTION0: enumTemplate, flags = 0, sessionKey = 0.
         var subscription = stackalloc byte[32];
         new Span<byte>(subscription, 32).Clear();
+        var template = stackalloc byte[32];
+        FillTemplate(template, TimeSpan.FromMinutes(1));
+        if (TemplateMode == 1)
+            new Span<byte>(template, 32).Clear();
+        if (TemplateMode != 0)
+            *(byte**)subscription = template;
         error = FwpmNetEventSubscribe1(_engine, subscription, &OnEvent, GCHandle.ToIntPtr(_self), out _subscription);
         if (error != 0)
             throw new IpHelperException(error, "FwpmNetEventSubscribe1");
+    }
+
+    // FWPM_NET_EVENT_ENUM_TEMPLATE0 { FILETIME startTime; FILETIME endTime; UINT32 numFilterConditions; FWPM_FILTER_CONDITION0* filterCondition; }
+    private static void FillTemplate(byte* template, TimeSpan back)
+    {
+        var span = new Span<byte>(template, 32);
+        span.Clear();
+        BinaryPrimitives.WriteInt64LittleEndian(span, DateTime.UtcNow.Subtract(back).ToFileTimeUtc());
+        BinaryPrimitives.WriteInt64LittleEndian(span[8..], DateTime.UtcNow.AddDays(1).ToFileTimeUtc());
+    }
+
+    /// <summary>Диагностика: типы событий, накопленных движком за последнее время (без подписки).</summary>
+    public static Dictionary<int, int> EnumRecentTypes(TimeSpan back, List<string> samples)
+    {
+        var result = new Dictionary<int, int>();
+        if (FwpmEngineOpen0(null, RPC_C_AUTHN_DEFAULT, IntPtr.Zero, IntPtr.Zero, out var engine) != 0)
+            return result;
+        try
+        {
+            var template = stackalloc byte[32];
+            FillTemplate(template, back);
+            if (FwpmNetEventCreateEnumHandle0(engine, template, out var handle) != 0)
+                return result;
+            try
+            {
+                if (FwpmNetEventEnum1(engine, handle, 5000, out var entries, out var count) != 0 || entries == IntPtr.Zero)
+                    return result;
+                try
+                {
+                    var mapper = new DevicePathMapper();
+                    for (int i = 0; i < count; i++)
+                    {
+                        var e = *(byte**)((byte*)entries + (i * IntPtr.Size));
+                        int type = BinaryPrimitives.ReadInt32LittleEndian(new ReadOnlySpan<byte>(e + HeaderSize, 4));
+                        result[type] = result.GetValueOrDefault(type) + 1;
+                        if (type == FWPM_NET_EVENT_TYPE_CLASSIFY_ALLOW && samples.Count < 10)
+                        {
+                            uint size = BinaryPrimitives.ReadUInt32LittleEndian(new ReadOnlySpan<byte>(e + HdrAppId, 4));
+                            var data = *(byte**)(e + HdrAppId + 8);
+                            var app = size > 1 && data is not null ? Encoding.Unicode.GetString(data, (int)size).TrimEnd((char)0) : "?";
+                            samples.Add(mapper.ToDosPath(app));
+                        }
+                    }
+                }
+                finally
+                {
+                    FwpmFreeMemory0(ref entries);
+                }
+            }
+            finally
+            {
+                _ = FwpmNetEventDestroyEnumHandle0(engine, handle);
+            }
+        }
+        finally
+        {
+            _ = FwpmEngineClose0(engine);
+        }
+        return result;
     }
 
     /// <summary>Диагностика: сколько раз Windows вызвала обработчик и первая ошибка в нём.</summary>
@@ -202,6 +270,15 @@ public sealed unsafe partial class AppConnectionMonitor : IDisposable
 
     [LibraryImport("fwpuclnt.dll")]
     private static partial int FwpmNetEventUnsubscribe0(IntPtr engineHandle, IntPtr eventsHandle);
+
+    [LibraryImport("fwpuclnt.dll")]
+    private static partial int FwpmNetEventCreateEnumHandle0(IntPtr engineHandle, byte* enumTemplate, out IntPtr enumHandle);
+
+    [LibraryImport("fwpuclnt.dll")]
+    private static partial int FwpmNetEventEnum1(IntPtr engineHandle, IntPtr enumHandle, uint numEntriesRequested, out IntPtr entries, out uint numEntriesReturned);
+
+    [LibraryImport("fwpuclnt.dll")]
+    private static partial int FwpmNetEventDestroyEnumHandle0(IntPtr engineHandle, IntPtr enumHandle);
 }
 
 /// <summary>Перевод пути устройства (\device\harddiskvolume3\...) в обычный путь (C:\...).</summary>

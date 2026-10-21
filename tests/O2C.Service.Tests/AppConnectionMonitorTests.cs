@@ -115,39 +115,35 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
         output.WriteLine("auditpol до: " + Run("auditpol", "/get /subcategory:{0CCE9226-69AE-11D9-BED3-505054503030}"));
         output.WriteLine("Брандмауэр: " + Run("netsh", "advfirewall show allprofiles state"));
 
-        foreach (var audit in new[] { false, true })
+        output.WriteLine("auditpol вкл: " + Run("auditpol", "/set /subcategory:{0CCE9226-69AE-11D9-BED3-505054503030} /success:enable /failure:enable"));
+        foreach (var mode in new[] { 0, 1, 2 })
         {
-            if (audit)
-                output.WriteLine("auditpol вкл: " + Run("auditpol", "/set /subcategory:{0CCE9226-69AE-11D9-BED3-505054503030} /success:enable /failure:enable"));
-
+            int before = AppConnectionMonitor.CallbackCount;
             var types = new ConcurrentDictionary<int, int>();
             var connections = new ConcurrentQueue<AppConnection>();
-            using var monitor = new AppConnectionMonitor(connections.Enqueue);
-            monitor.RawEvent += t => types.AddOrUpdate(t, 1, (_, n) => n + 1);
-            monitor.Start();
-            output.WriteLine($"--- аудит {(audit ? "ВКЛ" : "выкл")}: опции после Start = {monitor.Options}");
-            await Task.Delay(500);
+            using (var monitor = new AppConnectionMonitor(connections.Enqueue) { TemplateMode = mode })
+            {
+                monitor.RawEvent += t => types.AddOrUpdate(t, 1, (_, n) => n + 1);
+                monitor.Start();
+                await Task.Delay(500);
+                await MakeTraffic();
+                await Task.Delay(6000);
+            }
+            output.WriteLine($"--- шаблон {mode}: вызовов {AppConnectionMonitor.CallbackCount - before}, типы [{string.Join(", ", types.Select(kv => $"{kv.Key}={kv.Value}"))}], разрешённых {connections.Count}, ошибка {AppConnectionMonitor.LastCallbackError ?? "нет"}");
+            foreach (var c in connections.Take(5))
+                output.WriteLine($"     {c.Protocol} {c.RemoteAddress}:{c.RemotePort} {c.AppPath}");
+        }
 
-            for (int i = 0; i < 3; i++)
-            {
-                using var udp = new UdpClient(AddressFamily.InterNetwork);
-                await udp.SendAsync(new byte[] { 1 }, 1, new IPEndPoint(UdpTarget, 41000 + i));
-            }
-            try
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                await http.GetAsync(new Uri("https://www.example.com/"));
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-            {
-            }
-
-            await Task.Delay(8000);
-            output.WriteLine($"типы событий: {string.Join(", ", types.Select(kv => $"{kv.Key}={kv.Value}"))}");
-            output.WriteLine($"разрешённых соединений: {connections.Count}");
-            output.WriteLine($"вызовов обработчика: {AppConnectionMonitor.CallbackCount}, ошибка: {AppConnectionMonitor.LastCallbackError ?? "нет"}");
-            foreach (var c in connections.Take(8))
-                output.WriteLine($"  {c.Protocol} {c.RemoteAddress}:{c.RemotePort} {c.AppPath}");
+        using (var keep = new AppConnectionMonitor(_ => { }))
+        {
+            keep.Start();
+            await MakeTraffic();
+            await Task.Delay(3000);
+            var samples = new List<string>();
+            var recent = AppConnectionMonitor.EnumRecentTypes(TimeSpan.FromMinutes(5), samples);
+            output.WriteLine($"--- накоплено движком за 5 мин: [{string.Join(", ", recent.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+            foreach (var s in samples)
+                output.WriteLine($"     allow: {s}");
         }
 
         output.WriteLine("Security 5156 за минуту: " + Run("powershell",
@@ -160,5 +156,22 @@ public class AppConnectionMonitorTests(ITestOutputHelper output)
         var text = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
         p.WaitForExit();
         return string.Join(" | ", text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static async Task MakeTraffic()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            using var udp = new UdpClient(AddressFamily.InterNetwork);
+            await udp.SendAsync(new byte[] { 1 }, 1, new IPEndPoint(UdpTarget, 42000 + i));
+        }
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            await http.GetAsync(new Uri("https://www.example.com/"));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+        }
     }
 }
