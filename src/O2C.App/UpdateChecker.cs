@@ -31,6 +31,9 @@ internal sealed class UpdateChecker : IDisposable
     /// <summary>Найдена версия новее установленной (вызывается в потоке пула).</summary>
     public event Action<ReleaseInfo>? UpdateFound;
 
+    /// <summary>Проверять автоматически (при запуске и раз в 12 часов). Ручная проверка работает всегда.</summary>
+    public bool AutoCheck { get; set; } = true;
+
     public void Start() => _ = LoopAsync(_cts.Token);
 
     private async Task LoopAsync(CancellationToken ct)
@@ -40,7 +43,7 @@ internal sealed class UpdateChecker : IDisposable
             await Task.Delay(FirstDelay, ct);
             while (true)
             {
-                if (await CheckAsync(ct) is { } release)
+                if (AutoCheck && await CheckAsync(ct) is { Release: { } release } && release.IsNewerThan(CurrentVersion))
                     UpdateFound?.Invoke(release);
                 await Task.Delay(Interval, ct);
             }
@@ -50,8 +53,11 @@ internal sealed class UpdateChecker : IDisposable
         }
     }
 
-    /// <summary>Новая версия или null (нет новее, нет сети, GitHub недоступен).</summary>
-    public async Task<ReleaseInfo?> CheckAsync(CancellationToken ct)
+    /// <summary>
+    /// Последний релиз на GitHub или текст ошибки (нет сети, GitHub недоступен, непонятный ответ).
+    /// Новее ли он установленной версии — решает вызывающий.
+    /// </summary>
+    public async Task<(ReleaseInfo? Release, string? Error)> CheckAsync(CancellationToken ct)
     {
         try
         {
@@ -59,13 +65,13 @@ internal sealed class UpdateChecker : IDisposable
             request.Headers.Accept.ParseAdd("application/vnd.github+json");
             using var response = await _http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
-                return null;
+                return (null, $"GitHub ответил {(int)response.StatusCode}.");
             var release = ReleaseInfo.Parse(await response.Content.ReadAsStringAsync(ct));
-            return release is not null && release.IsNewerThan(CurrentVersion) ? release : null;
+            return release is null ? (null, "Не удалось разобрать ответ GitHub.") : (release, null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            return null;
+            return (null, "нет связи с GitHub.");
         }
     }
 

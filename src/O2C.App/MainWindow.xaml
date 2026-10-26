@@ -176,6 +176,7 @@
         <TextBlock Text="Настройки" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0,0,0" />
       </DockPanel>
       <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
         <StackPanel Margin="2,0,2,0" IsEnabled="{Binding ServiceAvailable}">
           <TextBlock Style="{StaticResource FieldLabel}" Text="Сервер (IP, имя или URL)" />
           <TextBox Text="{Binding Server, UpdateSourceTrigger=PropertyChanged}" />
@@ -205,6 +206,27 @@
             <Button DockPanel.Dock="Left" Content="Сохранить" Click="OnSaveClick" />
             <TextBlock Text="{Binding SaveMessage}" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="10,0,0,0" />
           </DockPanel>
+        </StackPanel>
+
+        <!-- Обновления: работают и без службы -->
+        <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Margin="2,16,2,0" Padding="0,12,0,0">
+          <StackPanel>
+            <DockPanel>
+              <Button x:Name="CheckUpdateButton" DockPanel.Dock="Right" Content="Проверить обновления"
+                      IsEnabled="{Binding CanCheckUpdate}" Click="OnCheckUpdateClick" />
+              <TextBlock Text="{x:Static local:MainViewModel.VersionText}" VerticalAlignment="Center" />
+            </DockPanel>
+            <DockPanel Margin="0,6,0,0">
+              <Button DockPanel.Dock="Right" Content="Обновить" Visibility="{Binding UpdateVisibility}" Margin="8,0,0,0"
+                      Click="OnUpdateClick" />
+              <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+            </DockPanel>
+            <CheckBox Content="Проверять обновления автоматически" IsChecked="{Binding AutoUpdateCheck}" Margin="0,8,0,0"
+                      Click="OnAutoUpdateCheckClick" />
+            <TextBlock Style="{StaticResource Caption}" Margin="26,2,0,0"
+                       Text="При запуске окна и раз в 12 часов — один запрос к GitHub, без сведений о компьютере." />
+          </StackPanel>
+        </Border>
         </StackPanel>
       </ScrollViewer>
     </Grid>

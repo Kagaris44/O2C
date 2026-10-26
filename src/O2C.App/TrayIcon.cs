@@ -14,12 +14,13 @@ internal sealed class TrayIcon : IDisposable
     private readonly Forms.ToolStripMenuItem _toggle;
     private readonly Dictionary<Color, Icon> _icons = [];
 
-    public TrayIcon(Action open, Action toggleConnection, Action exit)
+    public TrayIcon(Action open, Action toggleConnection, Action checkUpdates, Action exit)
     {
         _toggle = new Forms.ToolStripMenuItem("Подключить", null, (_, _) => toggleConnection());
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(_toggle);
         menu.Items.Add(new Forms.ToolStripMenuItem("Открыть", null, (_, _) => open()));
+        menu.Items.Add(new Forms.ToolStripMenuItem("Проверить обновления", null, (_, _) => checkUpdates()));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(new Forms.ToolStripMenuItem("Выход (подключение останется)", null, (_, _) => exit()));
 
