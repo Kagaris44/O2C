@@ -21,6 +21,12 @@ internal static class ServicePaths
 
     /// <summary>Адреса, к которым обращались программы из списка исключений (хранятся 7 дней).</summary>
     public static string AppAddressesFile => Path.Combine(DataDirectory, "app-addresses.json");
+
+    /// <summary>Скачанный список российских подсетей (запись «@ru»).</summary>
+    public static string RussianNetworksFile => Path.Combine(DataDirectory, "ru-networks.txt");
+
+    /// <summary>Российские подсети, к которым обращался компьютер (хранятся 7 дней).</summary>
+    public static string RussianSeenFile => Path.Combine(DataDirectory, "ru-networks-seen.json");
     public static string LogDirectory => ProductPaths.LogDirectory;
     public static string ServiceLogFile => Path.Combine(LogDirectory, "service.log");
     public static string OpenConnectLogFile => Path.Combine(LogDirectory, "openconnect.log");

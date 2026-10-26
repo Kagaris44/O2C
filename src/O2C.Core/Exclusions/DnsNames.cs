@@ -9,15 +9,20 @@ public static class DnsNames
     /// <summary>Приводит имя к виду для сравнения: нижний регистр, без завершающей точки.</summary>
     public static string Normalize(string name) => name.Trim().TrimEnd('.').ToLowerInvariant();
 
+    /// <summary>Доменные зоны записи «Российские сети»: .ru, .su и .рф (в журнале DNS — как xn--p1ai).</summary>
+    public static IReadOnlyList<string> RussianZones { get; } = ["ru", "su", "xn--p1ai", "рф"];
+
     /// <summary>
     /// Подходит ли имя к записи: для домена — точное совпадение, для маски *.example.com —
-    /// сам example.com и любые его поддомены (но не notexample.com).
+    /// сам example.com и любые его поддомены (но не notexample.com), для «Российских сетей» — имена в зонах .ru, .su, .рф.
     /// </summary>
     public static bool Matches(ExclusionEntry entry, string name)
     {
+        name = Normalize(name);
+        if (entry.Kind == ExclusionKind.RussianNetworks)
+            return RussianZones.Any(zone => name.EndsWith("." + zone, StringComparison.Ordinal));
         if (entry.Host is not { } host)
             return false;
-        name = Normalize(name);
         return entry.Kind switch
         {
             ExclusionKind.Host => name == host,

@@ -1,0 +1,29 @@
+name: ru-networks
+
+# Раз в неделю пересобирает список российских подсетей из статистики RIPE NCC
+# и заменяет файл ru-networks.txt в последнем релизе. Служба скачивает его оттуда раз в сутки.
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Update ru-networks.txt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build list
+        run: python3 build/ru-networks.py ru-networks.txt
+
+      - name: Upload to latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          gh release upload "$tag" ru-networks.txt --clobber --repo "$GITHUB_REPOSITORY"
+          echo "Обновлён ru-networks.txt в $tag: $(sed -n 3,4p ru-networks.txt | tr '\n' ' ')"

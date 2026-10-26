@@ -7,6 +7,7 @@
     OpenToConnect.Service.exe   — служба
     OpenToConnect.NetConfig.exe — настройка сети туннеля (её запускает openconnect)
     openconnect\                — openconnect.exe, DLL, wintun.dll
+    data\ru-networks.txt        — российские подсети для записи «@ru» (build\ru-networks.py, нужен Python 3)
 .PARAMETER OpenConnectDir
   Папка с результатом build-openconnect.sh. Обязательна для MSI; без неё (-NoInstaller)
   собирается только папка publish — для локальной проверки .NET-части.
@@ -31,6 +32,17 @@ foreach ($project in 'src\O2C.App\O2C.App.csproj', 'src\O2C.Service\O2C.Service.
 }
 # Отладочные символы в установщик не кладём.
 Get-ChildItem $publish -Filter *.pdb | Remove-Item
+
+# Список российских подсетей (статистика RIPE NCC) — в установщик и отдельным файлом для релиза.
+$ruList = Join-Path $publish 'data\ru-networks.txt'
+New-Item -ItemType Directory -Force (Split-Path $ruList) | Out-Null
+python (Join-Path $PSScriptRoot 'ru-networks.py') $ruList
+if ($LASTEXITCODE) {
+    if (-not $NoInstaller) { throw 'Не удалось собрать список российских сетей (build\ru-networks.py)' }
+    Write-Warning 'Список российских сетей не собран — запись @ru будет работать только по доменам.'
+} else {
+    Copy-Item $ruList (Join-Path $artifacts 'ru-networks.txt')
+}
 
 if ($NoInstaller) {
     Write-Host "Папка publish: $publish (установщик не собирался)"

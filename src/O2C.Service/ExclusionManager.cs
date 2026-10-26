@@ -19,6 +19,8 @@ namespace O2C.Service;
 /// Работает только при активном подключении; пересчитывается при изменении списка, смене сети
 /// и раз в 5 минут (обновление адресов доменов). Адреса доменов и масок *.example.com дополнительно
 /// берутся из журнала DNS-клиента Windows — сразу, как только приложение разрешило имя.
+/// Для программ и «Российских сетей» адреса берутся из событий ядра о соединениях: маршрут ставится
+/// по требованию, только на то, к чему компьютер действительно обращается.
 /// </summary>
 internal sealed class ExclusionManager : BackgroundService
 {
@@ -30,6 +32,9 @@ internal sealed class ExclusionManager : BackgroundService
     /// <summary>Сколько помним адрес, увиденный в DNS, если имя больше не запрашивали.</summary>
     private static readonly TimeSpan LearnedTtl = TimeSpan.FromHours(24);
     private const int MaxLearnedPerEntry = 256;
+
+    /// <summary>У «Российских сетей» через DNS запоминаются адреса сайтов .ru на зарубежных хостингах — их больше.</summary>
+    private const int MaxLearnedRussian = 2048;
 
     private readonly ConnectionManager _connection;
     private readonly SettingsStore _settings;
@@ -66,6 +71,10 @@ internal sealed class ExclusionManager : BackgroundService
     /// <summary>Адреса программ из списка: хранятся 7 дней и между перезапусками службы.</summary>
     private readonly AppAddressBook _apps = LoadApps();
     private DateTime _appsSavedAt = DateTime.MinValue;
+
+    /// <summary>Список российских подсетей и подсети из него, к которым обращался компьютер.</summary>
+    private readonly RussianNetworkSource _russia;
+    private readonly NetworkBook _russianSeen = LoadRussianSeen();
     private static readonly TimeSpan AppsSaveInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AppsTouchInterval = TimeSpan.FromMinutes(1);
     private CancellationTokenSource? _networkDebounce;
@@ -76,6 +85,8 @@ internal sealed class ExclusionManager : BackgroundService
         _settings = settings;
         _log = log;
         _logger = logger;
+        _russia = new RussianNetworkSource(logger, log);
+        _russia.Updated += TriggerFast;
     }
 
     public event Action<ExclusionReport>? ReportChanged;
@@ -130,6 +141,7 @@ internal sealed class ExclusionManager : BackgroundService
             _dnsWatcher?.Dispose();
             _appMonitor?.Dispose();
             SaveApps(force: true);
+            _russia.Dispose();
             RemoveAll();
         }
     }
@@ -194,21 +206,44 @@ internal sealed class ExclusionManager : BackgroundService
         return new AppAddressBook();
     }
 
+    private static NetworkBook LoadRussianSeen()
+    {
+        try
+        {
+            if (File.Exists(ServicePaths.RussianSeenFile))
+                return NetworkBook.Deserialize(File.ReadAllText(ServicePaths.RussianSeenFile));
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Повреждённый файл — подсети соберутся заново.
+        }
+        return new NetworkBook();
+    }
+
+    /// <summary>Сохраняет адреса программ и российские подсети (не чаще раза в 30 с, при остановке — сразу).</summary>
     private void SaveApps(bool force)
     {
-        if (!_apps.Dirty || (!force && DateTime.UtcNow - _appsSavedAt < AppsSaveInterval))
+        if ((!_apps.Dirty && !_russianSeen.Dirty) || (!force && DateTime.UtcNow - _appsSavedAt < AppsSaveInterval))
             return;
         try
         {
-            var tmp = ServicePaths.AppAddressesFile + ".tmp";
-            File.WriteAllText(tmp, _apps.Serialize());
-            File.Move(tmp, ServicePaths.AppAddressesFile, overwrite: true);
+            if (_apps.Dirty)
+                WriteAtomic(ServicePaths.AppAddressesFile, _apps.Serialize());
+            if (_russianSeen.Dirty)
+                WriteAtomic(ServicePaths.RussianSeenFile, _russianSeen.Serialize());
             _appsSavedAt = DateTime.UtcNow;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning(ex, "Не удалось сохранить адреса программ");
+            _logger.LogWarning(ex, "Не удалось сохранить адреса программ и подсети");
         }
+    }
+
+    private static void WriteAtomic(string path, string text)
+    {
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, text);
+        File.Move(tmp, path, overwrite: true);
     }
 
     /// <summary>Программа обратилась к адресу. Если она в списке — запоминаем адрес и ставим маршрут.</summary>
@@ -219,6 +254,16 @@ internal sealed class ExclusionManager : BackgroundService
         bool anyNew = false;
         foreach (var entry in _entries)
         {
+            if (entry.Kind == ExclusionKind.RussianNetworks)
+            {
+                if (_russia.List.Find(connection.RemoteAddress) is { } found &&
+                    _russianSeen.Learn(found.Network, found.Prefix, connection.Time))
+                {
+                    anyNew = true;
+                    _log.Add($"Российская сеть: {found.Network}/{found.Prefix} ({Path.GetFileName(connection.AppPath)} → {connection.RemoteAddress}:{connection.RemotePort})");
+                }
+                continue;
+            }
             if (!DnsNames.MatchesApp(entry, connection.AppPath))
                 continue;
             if (_apps.Learn(entry.Text, connection.RemoteAddress, connection.Time))
@@ -251,7 +296,7 @@ internal sealed class ExclusionManager : BackgroundService
         catch (IpHelperException ex)
         {
             _logger.LogWarning(ex, "Наблюдение за программами недоступно");
-            _log.Add($"Наблюдение за программами недоступно: {ex.Message}. Исключения программ работают по запомненным адресам.");
+            _log.Add($"Наблюдение за соединениями недоступно: {ex.Message}. Программы и российские сети работают по запомненным адресам.");
         }
     }
 
@@ -318,10 +363,17 @@ internal sealed class ExclusionManager : BackgroundService
             if (!DnsNames.Matches(entry, name))
                 continue;
             var known = _learned.GetOrAdd(entry.Text, _ => new ConcurrentDictionary<IPAddress, DateTime>());
+            int limit = entry.Kind == ExclusionKind.RussianNetworks ? MaxLearnedRussian : MaxLearnedPerEntry;
             bool added = false;
             foreach (var address in addresses)
             {
-                if (known.Count >= MaxLearnedPerEntry && !known.ContainsKey(address))
+                // Сайт .ru в российской сети — маршрут на всю подсеть; на зарубежном хостинге — только на адрес.
+                if (entry.Kind == ExclusionKind.RussianNetworks && _russia.List.Find(address) is { } found)
+                {
+                    added |= _russianSeen.Learn(found.Network, found.Prefix, DateTime.UtcNow);
+                    continue;
+                }
+                if (known.Count >= limit && !known.ContainsKey(address))
                     break;
                 if (known.TryAdd(address, DateTime.UtcNow))
                     added = true;
@@ -338,7 +390,7 @@ internal sealed class ExclusionManager : BackgroundService
             TriggerFast();
     }
 
-    /// <summary>Журнал DNS нужен, только пока есть подключение и в списке есть домены или маски.</summary>
+    /// <summary>Журнал DNS нужен, только пока есть подключение и в списке есть домены, маски или российские сети.</summary>
     private void UpdateDnsWatcher(bool needed)
     {
         try
@@ -384,11 +436,22 @@ internal sealed class ExclusionManager : BackgroundService
         var parsed = ExclusionParser.Parse(_settings.GetExclusionsText());
         _entries = parsed.Entries;
         bool resolve = Interlocked.Exchange(ref _needResolve, 0) == 1;
-        UpdateDnsWatcher(_active && parsed.Entries.Any(e => e.Kind is ExclusionKind.Host or ExclusionKind.Wildcard));
-        UpdateAppMonitor(_active && parsed.Entries.Any(e => e.Kind == ExclusionKind.Application));
+        bool russian = parsed.Entries.Any(e => e.Kind == ExclusionKind.RussianNetworks);
+        UpdateDnsWatcher(_active && parsed.Entries.Any(e => e.Kind is ExclusionKind.Host or ExclusionKind.Wildcard or ExclusionKind.RussianNetworks));
+        UpdateAppMonitor(_active && parsed.Entries.Any(e => e.Kind is ExclusionKind.Application or ExclusionKind.RussianNetworks));
         PruneLearned();
         _apps.Prune(DateTime.UtcNow, parsed.Entries.Where(e => e.Kind == ExclusionKind.Application)
             .Select(e => e.Text).ToHashSet(StringComparer.OrdinalIgnoreCase));
+        if (russian)
+        {
+            _russianSeen.Prune(DateTime.UtcNow);
+            if (_active)
+                _ = _russia.UpdateIfDueAsync(ct);
+        }
+        else
+        {
+            _russianSeen.Clear();   // запись удалили — подсети больше не нужны
+        }
 
         if (!_active)
         {
@@ -437,11 +500,13 @@ internal sealed class ExclusionManager : BackgroundService
             {
                 Entry = entry.Text,
                 Routes = itemRoutes.Count <= 10 ? itemRoutes : [.. itemRoutes.Take(10), $"…ещё {itemRoutes.Count - 10}"],
-                Error = itemRoutes.Count > 0 || entry.Kind is ExclusionKind.Wildcard or ExclusionKind.Application ? null : error,
+                Error = itemRoutes.Count > 0 || entry.Kind is ExclusionKind.Wildcard or ExclusionKind.Application or ExclusionKind.RussianNetworks
+                    ? null : error,
                 Note = itemRoutes.Count > 0 ? null : entry.Kind switch
                 {
                     ExclusionKind.Wildcard => "Ждёт обращений: адреса появятся, когда приложение откроет такой домен.",
                     ExclusionKind.Application => "Ждёт: адреса появятся, когда программа начнёт работать с сетью (хранятся 7 дней).",
+                    ExclusionKind.RussianNetworks => "Ждёт обращений к российским адресам и сайтам .ru, .su, .рф.",
                     _ => null,
                 },
             });
@@ -464,6 +529,15 @@ internal sealed class ExclusionManager : BackgroundService
 
         if (entry.Kind == ExclusionKind.Application)
             return ([.. _apps.Get(entry.Text).Select(a => (a, a.AddressFamily == AddressFamily.InterNetwork ? 32 : 128))], null);
+
+        if (entry.Kind == ExclusionKind.RussianNetworks)
+        {
+            // Подсети, к которым обращались, и адреса сайтов .ru/.su/.рф вне российских сетей (из журнала DNS).
+            var networks = _russianSeen.Get().ToList();
+            if (_learned.TryGetValue(entry.Text, out var hosts))
+                networks.AddRange(hosts.Keys.Select(a => (a, a.AddressFamily == AddressFamily.InterNetwork ? 32 : 128)));
+            return (networks, null);
+        }
 
         // Адреса из журнала DNS: для масок — единственный источник, для доменов — дополнение.
         List<IPAddress> learned = _learned.TryGetValue(entry.Text, out var seen) ? [.. seen.Keys] : [];

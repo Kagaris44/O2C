@@ -262,6 +262,9 @@ public partial class MainWindow : Window
             await AddExclusionsAsync(dialog.FolderName);
     }
 
+    private async void OnAddRussianClick(object sender, RoutedEventArgs e) =>
+        await AddExclusionsAsync(ExclusionParser.RussianNetworksEntry);
+
     private async void OnAddAppRunningClick(object sender, RoutedEventArgs e)
     {
         var picker = new RunningAppPicker { Owner = this };

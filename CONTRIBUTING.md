@@ -21,10 +21,12 @@
 | `build/patches/` | Патчи к OpenConnect (LGPL-2.1, как и сам OpenConnect) |
 | `build/fetch-runtime.ps1` | Загрузка `wintun.dll` с проверкой SHA-256 |
 | `build/publish.ps1` | Публикация и сборка MSI в `artifacts/` |
+| `build/ru-networks.py` | Список российских подсетей из статистики RIPE NCC (запись `@ru`) |
+| `.github/workflows/ru-networks.yml` | Еженедельное обновление `ru-networks.txt` в последнем релизе |
 
 ## Сборка
 
-Нужен .NET SDK 10.
+Нужен .NET SDK 10. Для `publish.ps1` ещё нужен Python 3: он собирает список российских подсетей (`build/ru-networks.py`, скачивает около 18 МБ статистики RIPE NCC и сверяет MD5).
 
 ```powershell
 dotnet build
@@ -40,4 +42,4 @@ dotnet test
 - применяет патчи из `build/patches`: запуск помощника `.exe` напрямую, без `cscript.exe`, и создание нового адаптера Wintun, если в реестре осталась запись удалённого;
 - записывает версии пакетов MSYS2 и копирует их лицензии (`PACKAGES.txt`, `licenses/`).
 
-**Релиз** создаётся по тегу: поднять `<Version>` в `Directory.Build.props`, добавить раздел версии в [CHANGELOG.md](CHANGELOG.md) (он станет текстом релиза), слить в `main` и отправить тег `vX.Y.Z`. CI проверит совпадение версии, соберёт MSI и опубликует релиз с SHA-256.
+**Релиз** создаётся по тегу: поднять `<Version>` в `Directory.Build.props`, добавить раздел версии в [CHANGELOG.md](CHANGELOG.md) (он станет текстом релиза), слить в `main` и отправить тег `vX.Y.Z`. CI проверит совпадение версии, соберёт MSI и опубликует релиз с SHA-256 и файлом `ru-networks.txt`.
