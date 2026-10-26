@@ -48,6 +48,10 @@ OpenToConnect распространяется под лицензией Apache-
 
 Установщик собран WiX Toolset 5. Вспомогательные модули WiX внутри MSI (настройка службы, закрытие окна перед обновлением) — © .NET Foundation и участники, лицензия Microsoft Reciprocal License (MS-RL), текст — `licenses\WiX-MS-RL.txt`.
 
+## Данные RIPE NCC
+
+Список российских подсетей `data\ru-networks.txt` (запись `@ru`) построен по общедоступной статистике распределения адресов RIPE NCC (`delegated-ripencc-extended-latest`, https://ftp.ripe.net/pub/stats/ripencc/). Сведения о распределении адресов публикует RIPE NCC; OpenToConnect только выбирает записи страны RU и объединяет соседние подсети.
+
 ## Только для разработки
 
 Не входят в установщик: xUnit (Apache-2.0) и Microsoft.NET.Test.Sdk (MIT) — для тестов; WiX Toolset — для сборки MSI; MSYS2 — для сборки OpenConnect.

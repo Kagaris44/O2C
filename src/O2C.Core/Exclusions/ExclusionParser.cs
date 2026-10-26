@@ -20,6 +20,12 @@ public enum ExclusionKind
     /// служба узнаёт из событий ядра Windows и запоминает на 7 дней.
     /// </summary>
     Application,
+
+    /// <summary>
+    /// Российские сети («@ru»): подсети, зарегистрированные в России (по данным RIPE NCC), и домены .ru, .su, .рф.
+    /// Маршруты ставятся по требованию — только на подсети, к которым компьютер действительно обращается.
+    /// </summary>
+    RussianNetworks,
 }
 
 public sealed record ExclusionEntry
@@ -44,11 +50,15 @@ public sealed record ExclusionParseResult(IReadOnlyList<ExclusionEntry> Entries,
 /// <summary>
 /// Разбирает список исключений: по одной записи на строку; «#» в начале строки или после пробела — комментарий.
 /// Запись — IPv4/IPv6-адрес, подсеть в формате адрес/длина, доменное имя (можно вставить URL),
-/// маска *.example.com, путь к программе (C:\...\app.exe) или к папке с программами (C:\...\).
+/// маска *.example.com, путь к программе (C:\...\app.exe) или к папке с программами (C:\...\),
+/// набор «@ru» — российские сети.
 /// </summary>
 public static partial class ExclusionParser
 {
     public const int MaxEntries = 500;
+
+    /// <summary>Запись «Российские сети».</summary>
+    public const string RussianNetworksEntry = "@ru";
 
     [GeneratedRegex(@"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -134,6 +144,13 @@ public static partial class ExclusionParser
     {
         if (LooksLikePath(value))
             return ParseApplication(value);
+
+        if (value.StartsWith('@'))
+        {
+            return string.Equals(value, RussianNetworksEntry, StringComparison.OrdinalIgnoreCase)
+                ? (new ExclusionEntry { Kind = ExclusionKind.RussianNetworks, Text = RussianNetworksEntry }, null)
+                : (null, "Неизвестный набор. Доступен @ru — российские сети.");
+        }
 
         if (value.StartsWith("*.", StringComparison.Ordinal))
         {

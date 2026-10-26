@@ -104,9 +104,12 @@
               <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE77F;"
                       ToolTip="Вставить списком из буфера обмена" Click="OnPasteExclusionsClick" />
               <Button x:Name="AddAppButton" Grid.Column="3" Style="{StaticResource IconButton}" Content="&#xE737;"
-                      ToolTip="Добавить программу или папку: её соединения пойдут мимо туннеля" Click="OnAddAppClick">
+                      ToolTip="Добавить программу, папку или российские сети" Click="OnAddAppClick">
                 <Button.ContextMenu>
                   <ContextMenu>
+                    <MenuItem Header="Российские сети (@ru)" Click="OnAddRussianClick"
+                              ToolTip="Российские подсети и сайты .ru, .su, .рф — напрямую, мимо туннеля" />
+                    <Separator />
                     <MenuItem Header="Из запущенных…" Click="OnAddAppRunningClick" />
                     <Separator />
                     <MenuItem Header="Программа (.exe)…" Click="OnAddAppFileClick" />
@@ -121,7 +124,7 @@
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
               <Grid>
                 <TextBlock Visibility="{Binding EmptyListVisibility}" Style="{StaticResource Caption}" Margin="2,8,0,0"
-                           Text="Здесь будут адреса, которые идут напрямую, мимо туннеля. Добавьте IP, подсеть, домен, маску *.домен или программу." />
+                           Text="Здесь будут адреса, которые идут напрямую, мимо туннеля. Добавьте IP, подсеть, домен, маску *.домен, программу или российские сети (@ru)." />
                 <ItemsControl ItemsSource="{Binding ExclusionRows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>

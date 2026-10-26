@@ -77,7 +77,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: OpenToConnect-msi
-          path: artifacts/*.msi
+          path: |
+            artifacts/*.msi
+            artifacts/ru-networks.txt
           if-no-files-found: error
 
   release:
@@ -115,4 +117,5 @@ jobs:
           $notes += "`n`nSHA-256 ``OpenToConnect-$version.msi``: ``$hash``"
           Set-Content notes.md $notes
 
-          gh release create $tag $msi --title "OpenToConnect $version" --notes-file notes.md
+          # ru-networks.txt — список российских подсетей; служба скачивает свежий из последнего релиза.
+          gh release create $tag $msi msi/ru-networks.txt --title "OpenToConnect $version" --notes-file notes.md
