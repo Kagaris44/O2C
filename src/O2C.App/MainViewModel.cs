@@ -34,6 +34,9 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     private string _exclusionsSummary = "";
     private ReleaseInfo? _update;
     private int _updateProgress = -1;
+    private string _updateStatus = "";
+    private bool _checkingUpdate;
+    private bool _autoUpdateCheck = true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -64,6 +67,25 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public Visibility UpdateVisibility => Update is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public static string VersionText => $"Версия {UpdateChecker.CurrentVersion.ToString(3)}";
+
+    /// <summary>Результат ручной проверки обновлений (в настройках).</summary>
+    public string UpdateStatus { get => _updateStatus; set => Set(ref _updateStatus, value); }
+
+    public bool CheckingUpdate
+    {
+        get => _checkingUpdate;
+        set
+        {
+            if (Set(ref _checkingUpdate, value))
+                OnPropertyChanged(nameof(CanCheckUpdate));
+        }
+    }
+
+    public bool CanCheckUpdate => !CheckingUpdate;
+
+    public bool AutoUpdateCheck { get => _autoUpdateCheck; set => Set(ref _autoUpdateCheck, value); }
 
     public string UpdateTooltip => Update is null ? ""
         : UpdateProgress >= 0 ? $"Загрузка версии {Update.Version.ToString(3)}: {UpdateProgress}%"

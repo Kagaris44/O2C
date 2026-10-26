@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly PipeClient _client = new();
     private readonly TrayIcon _tray;
     private readonly UpdateChecker _updates = new();
+    private readonly AppPreferences _prefs = AppPreferences.Load();
     private readonly DispatcherTimer _timer;
     private string? _newPassword;
     private bool _exiting;
@@ -28,7 +29,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = _vm;
 
-        _tray = new TrayIcon(ShowFromTray, () => _ = ToggleConnectionAsync(), () => _ = ExitAsync());
+        _tray = new TrayIcon(ShowFromTray, () => _ = ToggleConnectionAsync(), () => _ = CheckUpdatesFromTrayAsync(), () => _ = ExitAsync());
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => _vm.Tick(), Dispatcher);
 
         _client.ConnectionChanged += connected => Dispatcher.InvokeAsync(() => OnServiceConnectionChanged(connected));
@@ -42,11 +43,63 @@ public partial class MainWindow : Window
         _client.Start();
         UpdateTray();
 
-        _updates.UpdateFound += release => Dispatcher.InvokeAsync(() => _vm.Update = release);
+        _vm.AutoUpdateCheck = _prefs.AutoUpdateCheck;
+        _updates.AutoCheck = _prefs.AutoUpdateCheck;
+        _updates.UpdateFound += release => Dispatcher.InvokeAsync(() =>
+        {
+            _vm.Update = release;
+            _vm.UpdateStatus = $"Доступна версия {release.Version.ToString(3)}.";
+        });
         _updates.Start();
     }
 
     // ---------- Обновление ----------
+
+    private async void OnCheckUpdateClick(object sender, RoutedEventArgs e) => await CheckUpdatesAsync();
+
+    private async Task CheckUpdatesFromTrayAsync()
+    {
+        ShowFromTray();
+        _vm.SettingsOpen = true;
+        await CheckUpdatesAsync();
+    }
+
+    private async Task CheckUpdatesAsync()
+    {
+        if (_vm.CheckingUpdate)
+            return;
+        _vm.CheckingUpdate = true;
+        _vm.UpdateStatus = "Проверка…";
+        try
+        {
+            var (release, error) = await _updates.CheckAsync(CancellationToken.None);
+            if (release is null)
+            {
+                _vm.UpdateStatus = $"Не удалось проверить: {error}";
+            }
+            else if (release.IsNewerThan(UpdateChecker.CurrentVersion))
+            {
+                _vm.Update = release;
+                _vm.UpdateStatus = $"Доступна версия {release.Version.ToString(3)}.";
+            }
+            else
+            {
+                _vm.Update = null;
+                _vm.UpdateStatus = "Установлена последняя версия.";
+            }
+        }
+        finally
+        {
+            _vm.CheckingUpdate = false;
+        }
+    }
+
+    private void OnAutoUpdateCheckClick(object sender, RoutedEventArgs e)
+    {
+        _prefs.AutoUpdateCheck = _vm.AutoUpdateCheck;
+        _prefs.Save();
+        _updates.AutoCheck = _vm.AutoUpdateCheck;
+    }
 
     private async void OnUpdateClick(object sender, RoutedEventArgs e)
     {
