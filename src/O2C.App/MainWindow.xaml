@@ -93,6 +93,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <TextBox x:Name="NewExclusionInput" Text="{Binding NewExclusion, UpdateSourceTrigger=PropertyChanged}"
                        KeyDown="OnNewExclusionKeyDown" />
@@ -102,7 +103,7 @@
               <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE710;" Margin="4,0,0,0"
                       ToolTip="Добавить (Enter)" Click="OnAddExclusionClick" />
               <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE77F;"
-                      ToolTip="Вставить списком из буфера обмена" Click="OnPasteExclusionsClick" />
+                      ToolTip="Вставить списком из буфера обмена (адреса, код или ссылка O2C1.…)" Click="OnPasteExclusionsClick" />
               <Button x:Name="AddAppButton" Grid.Column="3" Style="{StaticResource IconButton}" Content="&#xE737;"
                       ToolTip="Добавить программу, папку или российские сети" Click="OnAddAppClick">
                 <Button.ContextMenu>
@@ -117,6 +118,8 @@
                   </ContextMenu>
                 </Button.ContextMenu>
               </Button>
+              <Button Grid.Column="4" Style="{StaticResource IconButton}" Content="&#xE72D;"
+                      ToolTip="Поделиться списком: ссылка или код" Click="OnShareClick" />
             </Grid>
             <TextBlock Grid.Row="1" Text="{Binding ExclusionsMessage}" Style="{StaticResource Caption}" Margin="2,4,0,4" />
 

@@ -1,0 +1,45 @@
+<Window x:Class="O2C.App.ShareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Поделиться списком" Icon="O2C.ico"
+        Width="480" Height="480" MinWidth="440" MinHeight="340"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="14,10,14,12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock TextWrapping="Wrap" Style="{StaticResource Caption}"
+               Text="Ссылка или код содержат весь список ниже. Получатель увидит его и подтвердит добавление; ссылка открывается в браузере, если программа не установлена." />
+
+    <ListBox x:Name="EntryList" Grid.Row="1" Margin="0,8,0,0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <ListBox.ItemContainerStyle>
+        <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+          <Setter Property="MinHeight" Value="0" />
+          <Setter Property="Padding" Value="10,3" />
+          <Setter Property="Focusable" Value="False" />
+        </Style>
+      </ListBox.ItemContainerStyle>
+    </ListBox>
+
+    <CheckBox x:Name="IncludeApps" Grid.Row="2" Margin="0,8,0,0"
+              Checked="OnIncludeAppsChanged" Unchecked="OnIncludeAppsChanged" />
+    <TextBlock x:Name="AppsWarning" Grid.Row="3" Margin="26,2,0,0" TextWrapping="Wrap" Style="{StaticResource Caption}"
+               Text="Пути к программам могут содержать имя пользователя (C:\Users\…) и у получателя могут не совпасть." />
+
+    <TextBlock x:Name="StatusText" Grid.Row="4" Margin="2,8,0,0" TextWrapping="Wrap" Style="{StaticResource Caption}" />
+
+    <DockPanel Grid.Row="5" Margin="0,10,0,0" LastChildFill="False">
+      <Button DockPanel.Dock="Right" Content="Закрыть" IsCancel="True" Margin="8,0,0,0" MinWidth="90" />
+      <Button x:Name="CopyCodeButton" DockPanel.Dock="Right" Content="Скопировать код" Margin="8,0,0,0"
+              Click="OnCopyCodeClick" ToolTip="Код вставляется кнопкой «Вставить списком»" />
+      <Button x:Name="CopyLinkButton" DockPanel.Dock="Right" Content="Скопировать ссылку" IsDefault="True"
+              Click="OnCopyLinkClick" />
+    </DockPanel>
+  </Grid>
+</Window>

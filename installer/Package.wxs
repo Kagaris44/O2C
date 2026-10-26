@@ -34,6 +34,7 @@
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="AppComponent" />
       <ComponentRef Id="AutostartComponent" />
+      <ComponentRef Id="LinkComponent" />
     </Feature>
 
     <!-- Окно живёт в области уведомлений и держит файлы — перед установкой закрываем его. -->
@@ -44,6 +45,16 @@
     <Component Id="AutostartComponent" Directory="INSTALLFOLDER">
       <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="OpenToConnect"
                      Type="string" Value="&quot;[INSTALLFOLDER]OpenToConnect.exe&quot; --minimized" KeyPath="yes" />
+    </Component>
+
+    <!-- Ссылки o2c://add/<код> (обмен списками исключений) открывает окно программы. -->
+    <Component Id="LinkComponent" Directory="INSTALLFOLDER">
+      <RegistryKey Root="HKLM" Key="Software\Classes\o2c">
+        <RegistryValue Type="string" Value="URL:OpenToConnect" KeyPath="yes" />
+        <RegistryValue Name="URL Protocol" Type="string" Value="" />
+        <RegistryValue Key="DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]OpenToConnect.exe&quot;,0" />
+        <RegistryValue Key="shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]OpenToConnect.exe&quot; &quot;%1&quot;" />
+      </RegistryKey>
     </Component>
 
     <Component Id="AppComponent" Directory="INSTALLFOLDER">

@@ -17,6 +17,10 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel _vm = new();
     private readonly PipeClient _client = new();
+
+    /// <summary>Список из ссылки o2c://, полученной до загрузки исключений от службы.</summary>
+    private string? _pendingImport;
+    private bool _exclusionsLoaded;
     private readonly TrayIcon _tray;
     private readonly UpdateChecker _updates = new();
     private readonly AppPreferences _prefs = AppPreferences.Load();
@@ -163,7 +167,10 @@ public partial class MainWindow : Window
         _vm.ServiceAvailable = connected;
         UpdateTray();
         if (!connected)
+        {
+            _exclusionsLoaded = false;
             return;
+        }
 
         LogBox.Clear();
         try
@@ -176,6 +183,12 @@ public partial class MainWindow : Window
             _vm.ExclusionsText = exclusions.ExclusionsText ?? "";
             if (exclusions.ExclusionReport is { } report)
                 _vm.ApplyExclusionReport(report);
+            _exclusionsLoaded = true;
+            if (_pendingImport is { } pending)
+            {
+                _pendingImport = null;
+                await ImportSharedAsync(pending);
+            }
         }
         catch (InvalidOperationException)
         {
@@ -232,6 +245,67 @@ public partial class MainWindow : Window
         await AddExclusionsAsync(text);
     }
 
+    private void OnShareClick(object sender, RoutedEventArgs e)
+    {
+        var entries = ExclusionParser.Parse(_vm.ExclusionsText).Entries;
+        if (entries.Count == 0)
+        {
+            _vm.ExclusionsMessage = "Список пуст — делиться нечем.";
+            return;
+        }
+        new ShareWindow(entries) { Owner = this }.ShowDialog();
+    }
+
+    /// <summary>Ссылка o2c://add/… из командной строки: предложить список сразу или после загрузки исключений.</summary>
+    public async void ImportFromLink(string link)
+    {
+        ShowFromTray();
+        if (_exclusionsLoaded)
+        {
+            await ImportSharedAsync(link);
+            return;
+        }
+        _pendingImport = link;
+        _vm.ExclusionsMessage = "Полученный список будет предложен, когда окно подключится к службе.";
+    }
+
+    /// <summary>Добавляет список из кода или ссылки (o2c://add/…, страница, вставка) после подтверждения.</summary>
+    /// <returns>false, если код не разобран.</returns>
+    public async Task<bool> ImportSharedAsync(string text)
+    {
+        if (!ShareCode.TryDecode(text, out var entries))
+        {
+            _vm.ExclusionsMessage = "Код списка повреждён или неполный — попросите прислать его ещё раз.";
+            return false;
+        }
+        var existing = ExclusionParser.Parse(_vm.ExclusionsText).Entries.Select(e => e.Text)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var fresh = entries.Where(e => !existing.Contains(e)).ToList();
+        if (fresh.Count == 0)
+        {
+            _vm.ExclusionsMessage = $"Все записи из полученного списка ({entries.Count}) уже есть.";
+            return true;
+        }
+
+        const int Shown = 15;
+        var lines = string.Join(Environment.NewLine, fresh.Take(Shown).Select(e => "  " + e));
+        if (fresh.Count > Shown)
+            lines += Environment.NewLine + $"  … и ещё {fresh.Count - Shown}";
+        var message = $"Добавить в исключения записей: {fresh.Count}?{Environment.NewLine}{Environment.NewLine}{lines}";
+        if (fresh.Count < entries.Count)
+            message += $"{Environment.NewLine}{Environment.NewLine}Уже в списке: {entries.Count - fresh.Count}.";
+        if (fresh.Any(ExclusionParser.LooksLikePath))
+            message += $"{Environment.NewLine}{Environment.NewLine}Пути к программам с другого компьютера могут не совпасть с вашими.";
+        message += $"{Environment.NewLine}{Environment.NewLine}Эти адреса пойдут напрямую, мимо туннеля. Добавляйте списки только от тех, кому доверяете.";
+
+        ShowFromTray();
+        if (MessageBox.Show(this, message, "Полученный список", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            await AddExclusionsAsync(string.Join(Environment.NewLine, fresh));
+        else
+            _vm.ExclusionsMessage = "Полученный список не добавлен.";
+        return true;
+    }
+
     private void OnAddAppClick(object sender, RoutedEventArgs e)
     {
         var menu = AddAppButton.ContextMenu;
@@ -277,6 +351,12 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(input))
         {
             _vm.ExclusionsMessage = "Введите IP, подсеть, домен или маску *.домен.";
+            return;
+        }
+        if (input.Contains(ShareCode.Prefix, StringComparison.Ordinal))
+        {
+            if (await ImportSharedAsync(input))
+                _vm.NewExclusion = "";
             return;
         }
 
