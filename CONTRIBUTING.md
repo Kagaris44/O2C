@@ -23,6 +23,7 @@
 | `build/publish.ps1` | Публикация и сборка MSI в `artifacts/` |
 | `build/ru-networks.py` | Список российских подсетей из статистики RIPE NCC (запись `@ru`) |
 | `.github/workflows/ru-networks.yml` | Еженедельное обновление `ru-networks.txt` в последнем релизе |
+| `docs/add/index.html` | Страница GitHub Pages для ссылок на списки исключений (формат кода — `ShareCode.cs`) |
 
 ## Сборка
 

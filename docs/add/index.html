@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self'">
+<title>Список исключений — OpenToConnect</title>
+<link rel="icon" href="../images/icon.png">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5d6670; --line: #dfe3e8;
+    --accent: #0a64c8; --accent-text: #ffffff; --error: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16191d; --card: #1f2328; --text: #e6e9ed; --muted: #9aa3ad; --line: #30363d;
+      --accent: #4d9cf0; --accent-text: #0b1520; --error: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 40px 16px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  header img { width: 36px; height: 36px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  ul {
+    list-style: none; margin: 0 0 16px; padding: 0; max-height: 360px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  li {
+    padding: 6px 12px; border-bottom: 1px solid var(--line);
+    font-family: Consolas, "Cascadia Mono", ui-monospace, monospace; font-size: 14px; overflow-wrap: anywhere;
+  }
+  li:last-child { border-bottom: 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .button {
+    display: inline-block; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; text-decoration: none; cursor: pointer;
+  }
+  .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .error { color: var(--error); }
+  a { color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="../images/icon.png" alt="">
+    <h1>Список исключений OpenToConnect</h1>
+  </header>
+
+  <section class="card" id="list" hidden>
+    <p id="summary"></p>
+    <ul id="entries"></ul>
+    <div class="actions">
+      <a class="button primary" id="open" href="#">Открыть в OpenToConnect</a>
+      <button class="button" id="copy" type="button">Скопировать код</button>
+    </div>
+    <p class="muted" id="status">Программа покажет список и спросит подтверждение. Если ссылка не открылась, скопируйте код и вставьте его кнопкой «Вставить списком» на вкладке «Исключения».</p>
+    <p class="muted">Адреса из списка пойдут напрямую, мимо туннеля. Добавляйте списки только от тех, кому доверяете.</p>
+  </section>
+
+  <section class="card" id="failure" hidden>
+    <p class="error" id="failure-text"></p>
+  </section>
+
+  <p class="muted" style="margin-top:16px">
+    Список хранится в самой ссылке (после знака #) и не передаётся на сервер.
+    <a href="https://github.com/Kagaris44/O2C/releases/latest">Скачать OpenToConnect</a> ·
+    <a href="https://github.com/Kagaris44/O2C">Описание</a>
+  </p>
+</main>
+<script>
+  "use strict";
+  // Формат совпадает с ShareCode.cs: "O2C1." + base64url(raw deflate(записи через \n)).
+  const PREFIX = "O2C1.";
+  const MAX_TEXT = 256 * 1024;
+  const MAX_ENTRIES = 2000;
+
+  async function decode(code) {
+    const payload = code.slice(PREFIX.length);
+    if (!/^[A-Za-z0-9_-]+$/.test(payload) || payload.length % 4 === 1) throw new Error("format");
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((payload.length + 3) % 4);
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    const reader = stream.getReader();
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_TEXT) { await reader.cancel(); throw new Error("size"); }
+      chunks.push(value);
+    }
+    const all = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
+    const entries = new TextDecoder("utf-8", { fatal: true }).decode(all)
+      .split("\n").map(s => s.trim()).filter(s => s.length > 0);
+    if (entries.length === 0 || entries.length > MAX_ENTRIES) throw new Error("count");
+    return entries;
+  }
+
+  function fail(text) {
+    document.getElementById("list").hidden = true;
+    document.getElementById("failure").hidden = false;
+    document.getElementById("failure-text").textContent = text;
+  }
+
+  async function show() {
+    const hash = decodeURIComponent(location.hash.slice(1)).trim();
+    const start = hash.indexOf(PREFIX);
+    if (start < 0) {
+      fail("В ссылке нет списка. Попросите прислать ссылку целиком — вместе с частью после знака #.");
+      return;
+    }
+    const code = hash.slice(start).match(/^O2C1\.[A-Za-z0-9_-]*/)[0];
+    let entries;
+    try {
+      entries = await decode(code);
+    } catch {
+      fail("Список в ссылке повреждён или обрезан. Попросите прислать ссылку ещё раз.");
+      return;
+    }
+
+    const list = document.getElementById("entries");
+    list.replaceChildren(...entries.map(e => {
+      const li = document.createElement("li");
+      li.textContent = e;
+      return li;
+    }));
+    document.getElementById("summary").textContent = "Записей в списке: " + entries.length + ".";
+    document.getElementById("open").href = "o2c://add/" + code;
+    document.getElementById("copy").onclick = async () => {
+      const status = document.getElementById("status");
+      try {
+        await navigator.clipboard.writeText(code);
+        status.textContent = "Код скопирован. Вставьте его кнопкой «Вставить списком» на вкладке «Исключения».";
+      } catch {
+        status.textContent = "Не удалось скопировать автоматически. Код: " + code;
+      }
+    };
+    document.getElementById("failure").hidden = true;
+    document.getElementById("list").hidden = false;
+  }
+
+  window.addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>
