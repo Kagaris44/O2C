@@ -339,6 +339,12 @@ public partial class MainWindow : Window
     private async void OnAddRussianClick(object sender, RoutedEventArgs e) =>
         await AddExclusionsAsync(ExclusionParser.RussianNetworksEntry);
 
+    private async void OnAddSetClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is string name && NetworkSets.Find(name) is { } set)
+            await AddExclusionsAsync(set.Entry);
+    }
+
     private async void OnAddAppRunningClick(object sender, RoutedEventArgs e)
     {
         var picker = new RunningAppPicker { Owner = this };

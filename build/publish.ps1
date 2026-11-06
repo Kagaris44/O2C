@@ -8,6 +8,7 @@
     OpenToConnect.NetConfig.exe — настройка сети туннеля (её запускает openconnect)
     openconnect\                — openconnect.exe, DLL, wintun.dll
     data\ru-networks.txt        — российские подсети для записи «@ru» (build\ru-networks.py, нужен Python 3)
+    data\blizzard-networks.txt  — сети Blizzard для записи «@blizzard» (build\as-networks.py)
 .PARAMETER OpenConnectDir
   Папка с результатом build-openconnect.sh. Обязательна для MSI; без неё (-NoInstaller)
   собирается только папка publish — для локальной проверки .NET-части.
@@ -42,6 +43,18 @@ if ($LASTEXITCODE) {
     Write-Warning 'Список российских сетей не собран — запись @ru будет работать только по доменам.'
 } else {
     Copy-Item $ruList (Join-Path $artifacts 'ru-networks.txt')
+}
+
+# Наборы сетей компаний (RIPEstat: подсети автономной системы).
+foreach ($set in @(@{ Asn = 'AS57976'; File = 'blizzard-networks.txt' })) {
+    $setList = Join-Path $publish "data\$($set.File)"
+    python (Join-Path $PSScriptRoot 'as-networks.py') $set.Asn $setList 20
+    if ($LASTEXITCODE) {
+        if (-not $NoInstaller) { throw "Не удалось собрать список $($set.File) (build\as-networks.py)" }
+        Write-Warning "Список $($set.File) не собран."
+    } else {
+        Copy-Item $setList (Join-Path $artifacts $set.File)
+    }
 }
 
 if ($NoInstaller) {

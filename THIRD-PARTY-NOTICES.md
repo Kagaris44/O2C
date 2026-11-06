@@ -52,6 +52,10 @@ OpenToConnect распространяется под лицензией Apache-
 
 Список российских подсетей `data\ru-networks.txt` (запись `@ru`) построен по общедоступной статистике распределения адресов RIPE NCC (`delegated-ripencc-extended-latest`, https://ftp.ripe.net/pub/stats/ripencc/). Сведения о распределении адресов публикует RIPE NCC; OpenToConnect только выбирает записи страны RU и объединяет соседние подсети.
 
+## Данные RIPEstat
+
+Список сетей Blizzard `data\blizzard-networks.txt` (запись `@blizzard`) построен по общедоступным данным RIPEstat (`announced-prefixes`, https://stat.ripe.net/) о подсетях, которые анонсирует автономная система AS57976. Данные публикует RIPE NCC по сведениям коллекторов маршрутов RIPE RIS; OpenToConnect объединяет соседние подсети.
+
 ## Только для разработки
 
 Не входят в установщик: xUnit (Apache-2.0) и Microsoft.NET.Test.Sdk (MIT) — для тестов; WiX Toolset — для сборки MSI; MSYS2 — для сборки OpenConnect.

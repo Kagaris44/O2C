@@ -105,11 +105,13 @@
               <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE77F;"
                       ToolTip="Вставить списком из буфера обмена (адреса, код или ссылка O2C1.…)" Click="OnPasteExclusionsClick" />
               <Button x:Name="AddAppButton" Grid.Column="3" Style="{StaticResource IconButton}" Content="&#xE737;"
-                      ToolTip="Добавить программу, папку или российские сети" Click="OnAddAppClick">
+                      ToolTip="Добавить программу, папку или набор сетей" Click="OnAddAppClick">
                 <Button.ContextMenu>
                   <ContextMenu>
                     <MenuItem Header="Российские сети (@ru)" Click="OnAddRussianClick"
                               ToolTip="Российские подсети и сайты .ru, .su, .рф — напрямую, мимо туннеля" />
+                    <MenuItem Header="Сети Blizzard (@blizzard)" Tag="blizzard" Click="OnAddSetClick"
+                              ToolTip="Battle.net и серверы игр Blizzard — напрямую, маршруты ставятся сразу при подключении" />
                     <Separator />
                     <MenuItem Header="Из запущенных…" Click="OnAddAppRunningClick" />
                     <Separator />
