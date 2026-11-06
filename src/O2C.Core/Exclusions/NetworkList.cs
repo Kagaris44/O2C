@@ -96,6 +96,15 @@ public sealed class NetworkList
 
     public bool Contains(IPAddress address) => Find(address) is not null;
 
+    /// <summary>Все подсети списка.</summary>
+    public IEnumerable<(IPAddress Network, int Prefix)> All()
+    {
+        for (int i = 0; i < _v4Start.Length; i++)
+            yield return (FromUInt32(_v4Start[i]), _v4Prefix[i]);
+        for (int i = 0; i < _v6Start.Length; i++)
+            yield return (FromUInt128(_v6Start[i]), _v6Prefix[i]);
+    }
+
     /// <summary>Индекс последнего начала диапазона, не большего value; -1, если такого нет.</summary>
     private static int Floor<T>(T[] starts, T value) where T : IComparable<T>
     {

@@ -1,0 +1,34 @@
+name: network-lists
+
+# Раз в неделю пересобирает списки сетей для наборов исключений и заменяет файлы в последнем релизе:
+# ru-networks.txt (@ru, статистика RIPE NCC) и blizzard-networks.txt (@blizzard, RIPEstat, AS57976).
+# Служба скачивает их оттуда раз в сутки.
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Update network lists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build lists
+        run: |
+          python3 build/ru-networks.py ru-networks.txt
+          python3 build/as-networks.py AS57976 blizzard-networks.txt 20
+
+      - name: Upload to latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          gh release upload "$tag" ru-networks.txt blizzard-networks.txt --clobber --repo "$GITHUB_REPOSITORY"
+          for f in ru-networks.txt blizzard-networks.txt; do
+            echo "Обновлён $f в $tag: $(sed -n 3,4p $f | tr '\n' ' ')"
+          done

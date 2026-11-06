@@ -73,7 +73,10 @@ internal sealed class ExclusionManager : BackgroundService
     private DateTime _appsSavedAt = DateTime.MinValue;
 
     /// <summary>Список российских подсетей и подсети из него, к которым обращался компьютер.</summary>
-    private readonly RussianNetworkSource _russia;
+    private readonly NetworkListSource _russia;
+
+    /// <summary>Списки наборов сетей («@blizzard»): загружаются при первой записи набора.</summary>
+    private readonly ConcurrentDictionary<string, NetworkListSource> _sets = new(StringComparer.OrdinalIgnoreCase);
     private readonly NetworkBook _russianSeen = LoadRussianSeen();
     private static readonly TimeSpan AppsSaveInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AppsTouchInterval = TimeSpan.FromMinutes(1);
@@ -85,7 +88,7 @@ internal sealed class ExclusionManager : BackgroundService
         _settings = settings;
         _log = log;
         _logger = logger;
-        _russia = new RussianNetworkSource(logger, log);
+        _russia = new NetworkListSource("ru-networks.txt", "российских сетей", 3000, logger, log);
         _russia.Updated += TriggerFast;
     }
 
@@ -142,6 +145,8 @@ internal sealed class ExclusionManager : BackgroundService
             _appMonitor?.Dispose();
             SaveApps(force: true);
             _russia.Dispose();
+            foreach (var set in _sets.Values)
+                set.Dispose();
             RemoveAll();
         }
     }
@@ -249,7 +254,8 @@ internal sealed class ExclusionManager : BackgroundService
     /// <summary>Программа обратилась к адресу. Если она в списке — запоминаем адрес и ставим маршрут.</summary>
     private void OnAppConnection(AppConnection connection)
     {
-        if (!_active || IPAddress.IsLoopback(connection.RemoteAddress) || connection.RemoteAddress.Equals(IPAddress.Any))
+        // Локальные, частные и групповые адреса не исключаем: см. AddressFilter.
+        if (!_active || !AddressFilter.IsPublic(connection.RemoteAddress))
             return;
         bool anyNew = false;
         foreach (var entry in _entries)
@@ -365,7 +371,7 @@ internal sealed class ExclusionManager : BackgroundService
             var known = _learned.GetOrAdd(entry.Text, _ => new ConcurrentDictionary<IPAddress, DateTime>());
             int limit = entry.Kind == ExclusionKind.RussianNetworks ? MaxLearnedRussian : MaxLearnedPerEntry;
             bool added = false;
-            foreach (var address in addresses)
+            foreach (var address in addresses.Where(AddressFilter.IsPublic))
             {
                 // Сайт .ru в российской сети — маршрут на всю подсеть; на зарубежном хостинге — только на адрес.
                 if (entry.Kind == ExclusionKind.RussianNetworks && _russia.List.Find(address) is { } found)
@@ -452,6 +458,11 @@ internal sealed class ExclusionManager : BackgroundService
         {
             _russianSeen.Clear();   // запись удалили — подсети больше не нужны
         }
+        if (_active)
+        {
+            foreach (var set in parsed.Entries.Where(e => e.Kind == ExclusionKind.NetworkSet))
+                _ = SetSource(set.Set!).UpdateIfDueAsync(ct);
+        }
 
         if (!_active)
         {
@@ -522,13 +533,31 @@ internal sealed class ExclusionManager : BackgroundService
         SetReport(new ExclusionReport { Active = true, Message = message, Items = items, ParseErrors = parsed.Errors });
     }
 
+    private NetworkListSource SetSource(NetworkSet set) => _sets.GetOrAdd(set.Name, _ =>
+    {
+        var source = new NetworkListSource(set.FileName, $"набора {set.Entry}", set.MinNetworks, _logger, _log);
+        source.Updated += TriggerFast;
+        return source;
+    });
+
     private async Task<(List<(IPAddress Address, int Length)> Networks, string? Error)> GetNetworksAsync(ExclusionEntry entry, bool resolve, CancellationToken ct)
     {
         if (entry.Kind == ExclusionKind.Network)
             return ([(entry.Address!, entry.PrefixLength)], null);
 
         if (entry.Kind == ExclusionKind.Application)
-            return ([.. _apps.Get(entry.Text).Select(a => (a, a.AddressFamily == AddressFamily.InterNetwork ? 32 : 128))], null);
+        {
+            return ([.. _apps.Get(entry.Text).Where(AddressFilter.IsPublic)
+                .Select(a => (a, a.AddressFamily == AddressFamily.InterNetwork ? 32 : 128))], null);
+        }
+
+        if (entry.Kind == ExclusionKind.NetworkSet)
+        {
+            var list = SetSource(entry.Set!).List;
+            return list.Count4 + list.Count6 > 0
+                ? ([.. list.All()], null)
+                : ([], "Список сетей не загружен — подробности в журнале.");
+        }
 
         if (entry.Kind == ExclusionKind.RussianNetworks)
         {

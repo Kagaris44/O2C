@@ -22,7 +22,8 @@
 | `build/fetch-runtime.ps1` | Загрузка `wintun.dll` с проверкой SHA-256 |
 | `build/publish.ps1` | Публикация и сборка MSI в `artifacts/` |
 | `build/ru-networks.py` | Список российских подсетей из статистики RIPE NCC (запись `@ru`) |
-| `.github/workflows/ru-networks.yml` | Еженедельное обновление `ru-networks.txt` в последнем релизе |
+| `build/as-networks.py` | Список подсетей автономной системы для набора сетей компании (`@blizzard` — AS57976, RIPEstat) |
+| `.github/workflows/network-lists.yml` | Еженедельное обновление `ru-networks.txt` и `blizzard-networks.txt` в последнем релизе |
 | `docs/add/index.html` | Страница GitHub Pages для ссылок на списки исключений (формат кода — `ShareCode.cs`) |
 
 ## Сборка
@@ -43,4 +44,4 @@ dotnet test
 - применяет патчи из `build/patches`: запуск помощника `.exe` напрямую, без `cscript.exe`, и создание нового адаптера Wintun, если в реестре осталась запись удалённого;
 - записывает версии пакетов MSYS2 и копирует их лицензии (`PACKAGES.txt`, `licenses/`).
 
-**Релиз** создаётся по тегу: поднять `<Version>` в `Directory.Build.props`, добавить раздел версии в [CHANGELOG.md](CHANGELOG.md) (он станет текстом релиза), слить в `main` и отправить тег `vX.Y.Z`. CI проверит совпадение версии, соберёт MSI и опубликует релиз с SHA-256 и файлом `ru-networks.txt`.
+**Релиз** создаётся по тегу: поднять `<Version>` в `Directory.Build.props`, добавить раздел версии в [CHANGELOG.md](CHANGELOG.md) (он станет текстом релиза), слить в `main` и отправить тег `vX.Y.Z`. CI проверит совпадение версии, соберёт MSI и опубликует релиз с SHA-256 и файлами `ru-networks.txt` и `blizzard-networks.txt`.

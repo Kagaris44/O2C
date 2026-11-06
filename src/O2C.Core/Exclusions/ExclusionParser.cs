@@ -26,6 +26,12 @@ public enum ExclusionKind
     /// Маршруты ставятся по требованию — только на подсети, к которым компьютер действительно обращается.
     /// </summary>
     RussianNetworks,
+
+    /// <summary>
+    /// Набор сетей компании («@blizzard», см. <see cref="NetworkSets"/>): маршруты на все подсети набора
+    /// ставятся сразу при подключении.
+    /// </summary>
+    NetworkSet,
 }
 
 public sealed record ExclusionEntry
@@ -40,6 +46,9 @@ public sealed record ExclusionEntry
     /// <summary>Для <see cref="ExclusionKind.Application"/>: полный путь к .exe или к папке (с завершающим «\»).</summary>
     public string? AppPath { get; init; }
 
+    /// <summary>Для <see cref="ExclusionKind.NetworkSet"/>: набор сетей.</summary>
+    public NetworkSet? Set { get; init; }
+
     public bool IsFolder => Kind == ExclusionKind.Application && AppPath is { } p && p.EndsWith('\\');
 }
 
@@ -51,7 +60,7 @@ public sealed record ExclusionParseResult(IReadOnlyList<ExclusionEntry> Entries,
 /// Разбирает список исключений: по одной записи на строку; «#» в начале строки или после пробела — комментарий.
 /// Запись — IPv4/IPv6-адрес, подсеть в формате адрес/длина, доменное имя (можно вставить URL),
 /// маска *.example.com, путь к программе (C:\...\app.exe) или к папке с программами (C:\...\),
-/// набор «@ru» — российские сети.
+/// набор «@ru» — российские сети, набор сетей компании («@blizzard»).
 /// </summary>
 public static partial class ExclusionParser
 {
@@ -147,9 +156,12 @@ public static partial class ExclusionParser
 
         if (value.StartsWith('@'))
         {
-            return string.Equals(value, RussianNetworksEntry, StringComparison.OrdinalIgnoreCase)
-                ? (new ExclusionEntry { Kind = ExclusionKind.RussianNetworks, Text = RussianNetworksEntry }, null)
-                : (null, "Неизвестный набор. Доступен @ru — российские сети.");
+            if (string.Equals(value, RussianNetworksEntry, StringComparison.OrdinalIgnoreCase))
+                return (new ExclusionEntry { Kind = ExclusionKind.RussianNetworks, Text = RussianNetworksEntry }, null);
+            if (NetworkSets.Find(value[1..]) is { } set)
+                return (new ExclusionEntry { Kind = ExclusionKind.NetworkSet, Text = set.Entry, Set = set }, null);
+            return (null, "Неизвестный набор. Доступны: @ru — российские сети, "
+                + string.Join(", ", NetworkSets.All.Select(s => $"{s.Entry} — {s.Title.ToLowerInvariant()}")) + ".");
         }
 
         if (value.StartsWith("*.", StringComparison.Ordinal))

@@ -13,21 +13,25 @@ internal sealed record ExclusionRow(string Entry, string Tag, string Tooltip, Br
     private bool IsApp => ExclusionParser.LooksLikePath(Entry);
     private bool IsFolder => IsApp && Entry.EndsWith(Sep);
     private bool IsRussian => string.Equals(Entry, ExclusionParser.RussianNetworksEntry, StringComparison.OrdinalIgnoreCase);
+    private NetworkSet? Set => Entry.StartsWith('@') ? NetworkSets.Find(Entry[1..]) : null;
 
     /// <summary>Для программ — имя файла или папки (полный путь в подсказке), для наборов — название, для остальных — запись как есть.</summary>
     public string Display => IsRussian ? "Российские сети"
+        : Set is { } set ? set.Title
         : !IsApp ? Entry
         : IsFolder ? Path.GetFileName(Entry.TrimEnd(Sep)) + Sep
         : Path.GetFileName(Entry);
 
-    /// <summary>Значок Segoe Fluent Icons: глобус (E774), папка (E8B7) или программа (E737); у адресов значка нет.</summary>
+    /// <summary>Значок Segoe Fluent Icons: глобус (E774), геймпад (E7FC), папка (E8B7) или программа (E737); у адресов значка нет.</summary>
     public string Icon => IsRussian ? char.ToString((char)0xE774)
+        : Set is not null ? char.ToString((char)0xE7FC)
         : !IsApp ? "" : IsFolder ? char.ToString((char)0xE8B7) : char.ToString((char)0xE737);
 
-    public Visibility IconVisibility => IsApp || IsRussian ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility IconVisibility => IsApp || IsRussian || Set is not null ? Visibility.Visible : Visibility.Collapsed;
 
     public string FullTooltip => IsRussian
         ? "Подсети, зарегистрированные в России, и сайты .ru, .su, .рф — маршрут ставится, когда компьютер к ним обращается."
           + Environment.NewLine + Tooltip
+        : Set is { } set ? set.Description + Environment.NewLine + Tooltip
         : IsApp ? Entry + Environment.NewLine + Tooltip : Tooltip;
 }

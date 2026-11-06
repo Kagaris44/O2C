@@ -3,18 +3,20 @@ using O2C.Core.Exclusions;
 namespace O2C.Service;
 
 /// <summary>
-/// Список российских подсетей для записи «@ru». Берётся более свежий из двух: вложенного в установщик
-/// (data\ru-networks.txt рядом со службой) и скачанного с GitHub (C:\ProgramData\OpenToConnect\ru-networks.txt).
+/// Список подсетей для набора («@ru», «@blizzard»). Берётся более свежий из двух: вложенного в установщик
+/// (data\&lt;файл&gt; рядом со службой) и скачанного с GitHub (C:\ProgramData\OpenToConnect\&lt;файл&gt;).
 /// Скачивается не чаще раза в сутки, пока запись есть в списке и есть подключение.
 /// </summary>
-internal sealed class RussianNetworkSource : IDisposable
+internal sealed class NetworkListSource : IDisposable
 {
-    /// <summary>Файл прикладывается к каждому релизу и обновляется еженедельно (workflow ru-networks).</summary>
-    public const string DownloadUrl = "https://github.com/Kagaris44/O2C/releases/latest/download/ru-networks.txt";
+    /// <summary>Файлы прикладываются к каждому релизу и обновляются еженедельно (workflow network-lists).</summary>
+    private const string DownloadBase = "https://github.com/Kagaris44/O2C/releases/latest/download/";
 
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromDays(1);
-    private const int MinNetworks = 3000;
 
+    private readonly string _fileName;
+    private readonly string _title;
+    private readonly int _minNetworks;
     private readonly ILogger _logger;
     private readonly LogBuffer _log;
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(2) };
@@ -22,14 +24,21 @@ internal sealed class RussianNetworkSource : IDisposable
     private DateTime _lastAttempt = DateTime.MinValue;
     private NetworkList? _list;
 
-    public RussianNetworkSource(ILogger logger, LogBuffer log)
+    /// <param name="fileName">Имя файла списка (одинаковое в установщике, в данных службы и в релизе).</param>
+    /// <param name="title">Название для журнала в родительном падеже: «российских сетей», «сетей Blizzard».</param>
+    /// <param name="minNetworks">Минимум подсетей IPv4: список короче считается испорченным.</param>
+    public NetworkListSource(string fileName, string title, int minNetworks, ILogger logger, LogBuffer log)
     {
+        _fileName = fileName;
+        _title = title;
+        _minNetworks = minNetworks;
         _logger = logger;
         _log = log;
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("OpenToConnect");
     }
 
-    public static string BundledFile => Path.Combine(AppContext.BaseDirectory, "data", "ru-networks.txt");
+    private string BundledFile => Path.Combine(AppContext.BaseDirectory, "data", _fileName);
+    private string DownloadedFile => Path.Combine(ServicePaths.DataDirectory, _fileName);
 
     /// <summary>Текущий список (загружается при первом обращении).</summary>
     public NetworkList List => _list ??= LoadBest();
@@ -40,14 +49,14 @@ internal sealed class RussianNetworkSource : IDisposable
     private NetworkList LoadBest()
     {
         var bundled = TryLoad(BundledFile);
-        var downloaded = TryLoad(ServicePaths.RussianNetworksFile);
+        var downloaded = TryLoad(DownloadedFile);
         var best = string.CompareOrdinal(downloaded?.Date, bundled?.Date) > 0 ? downloaded : bundled ?? downloaded;
         if (best is null)
         {
-            _log.Add("Список российских сетей не найден — запись @ru будет работать только по доменам .ru, .su, .рф.");
+            _log.Add($"Список {_title} не найден ({_fileName}).");
             return NetworkList.Empty;
         }
-        _logger.LogInformation("Российские сети: {Count4} IPv4, {Count6} IPv6, данные от {Date}", best.Count4, best.Count6, best.Date);
+        _logger.LogInformation("Список {Title}: {Count4} IPv4, {Count6} IPv6, данные от {Date}", _title, best.Count4, best.Count6, best.Date);
         return best;
     }
 
@@ -58,7 +67,7 @@ internal sealed class RussianNetworkSource : IDisposable
             if (!File.Exists(path))
                 return null;
             var list = NetworkList.Parse(File.ReadAllText(path));
-            return list.Count4 >= MinNetworks ? list : null;
+            return list.Count4 >= _minNetworks ? list : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -75,27 +84,27 @@ internal sealed class RussianNetworkSource : IDisposable
         try
         {
             _lastAttempt = DateTime.UtcNow;
-            var text = await _http.GetStringAsync(DownloadUrl, ct);
+            var text = await _http.GetStringAsync(DownloadBase + _fileName, ct);
             var list = NetworkList.Parse(text);
-            if (list.Count4 < MinNetworks)
+            if (list.Count4 < _minNetworks)
             {
-                _logger.LogWarning("Скачанный список российских сетей подозрительно мал: {Count}", list.Count4);
+                _logger.LogWarning("Скачанный список {Title} подозрительно мал: {Count}", _title, list.Count4);
                 return;
             }
             if (string.CompareOrdinal(list.Date, List.Date) <= 0)
                 return;
 
-            var tmp = ServicePaths.RussianNetworksFile + ".tmp";
+            var tmp = DownloadedFile + ".tmp";
             await File.WriteAllTextAsync(tmp, text, ct);
-            File.Move(tmp, ServicePaths.RussianNetworksFile, overwrite: true);
+            File.Move(tmp, DownloadedFile, overwrite: true);
             _list = list;
-            _log.Add($"Список российских сетей обновлён: данные от {list.Date}, подсетей {list.Count4 + list.Count6}.");
+            _log.Add($"Список {_title} обновлён: данные от {list.Date}, подсетей {list.Count4 + list.Count6}.");
             Updated?.Invoke();
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException
                                        or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            _logger.LogInformation("Не удалось обновить список российских сетей: {Message}", ex.Message);
+            _logger.LogInformation("Не удалось обновить список {Title}: {Message}", _title, ex.Message);
         }
         finally
         {
